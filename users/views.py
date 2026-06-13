@@ -39,6 +39,8 @@ class RegisterView(APIView):
         resp = requests.post(url, json={
             'username': data['username'],
             'email': data['email'],
+            'firstName': data['username'],
+            'lastName': '',
             'enabled': True,
             'emailVerified': True,
             'requiredActions': [],
