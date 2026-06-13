@@ -40,6 +40,8 @@ class RegisterView(APIView):
             'username': data['username'],
             'email': data['email'],
             'enabled': True,
+            'emailVerified': True,
+            'requiredActions': [],
             'credentials': [{'type': 'password', 'value': data['password'], 'temporary': False}],
         }, headers={'Authorization': f'Bearer {admin_token}'}, timeout=10)
 
