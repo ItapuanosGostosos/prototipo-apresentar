@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'portfolios',
     'news',
     'notifications',
+    'sentiment_ai.apps.SentimentAIConfig',
 ]
 
 MIDDLEWARE = [
