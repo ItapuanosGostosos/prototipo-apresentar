@@ -61,7 +61,7 @@ services:
     ports:
       - "8000:8000"
     command: >
-      bash -c "python manage.py migrate &&
+      bash -c "python manage.py migrate --fake-initial &&
                gunicorn --bind 0.0.0.0:8000 portifolio_tracker_api.wsgi:application"
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/8000'"]
