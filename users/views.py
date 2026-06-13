@@ -8,7 +8,6 @@ from .serializers import RegisterSerializer, UserSerializer
 
 
 def _keycloak_admin_token() -> str:
-    """Obtém token de admin do realm master para gerenciar usuários."""
     url = f"{settings.KEYCLOAK_SERVER_URL}/realms/master/protocol/openid-connect/token"
     resp = requests.post(url, data={
         'grant_type': 'password',
@@ -26,10 +25,7 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        email = serializer.validated_data['email']
-        username = serializer.validated_data['username']
-        password = serializer.validated_data['password']
+        data = serializer.validated_data
 
         try:
             admin_token = _keycloak_admin_token()
@@ -41,19 +37,57 @@ class RegisterView(APIView):
 
         url = f"{settings.KEYCLOAK_SERVER_URL}/admin/realms/{settings.KEYCLOAK_REALM}/users"
         resp = requests.post(url, json={
-            'username': username,
-            'email': email,
+            'username': data['username'],
+            'email': data['email'],
             'enabled': True,
-            'credentials': [{'type': 'password', 'value': password, 'temporary': False}],
+            'credentials': [{'type': 'password', 'value': data['password'], 'temporary': False}],
         }, headers={'Authorization': f'Bearer {admin_token}'}, timeout=10)
 
         if resp.status_code == 409:
-            return Response({'detail': 'E-mail já cadastrado.'}, status=status.HTTP_409_CONFLICT)
+            return Response({'detail': 'E-mail já cadastrado.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not resp.ok:
             return Response({'detail': 'Erro ao criar conta.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({'email': email, 'username': username}, status=status.HTTP_201_CREATED)
+        return Response({'email': data['email'], 'username': data['username']}, status=status.HTTP_201_CREATED)
+
+
+class LoginView(APIView):
+    """Proxies login to Keycloak and returns access + refresh tokens."""
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request):
+        email = request.data.get('email', '')
+        password = request.data.get('password', '')
+
+        if not email or not password:
+            return Response({'detail': 'Email e senha são obrigatórios.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        url = f"{settings.KEYCLOAK_SERVER_URL}/realms/{settings.KEYCLOAK_REALM}/protocol/openid-connect/token"
+        try:
+            resp = requests.post(url, data={
+                'grant_type': 'password',
+                'client_id': settings.KEYCLOAK_CLIENT_ID,
+                'username': email,
+                'password': password,
+            }, timeout=10)
+        except Exception:
+            return Response(
+                {'detail': 'Não foi possível conectar ao servidor de autenticação.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if resp.status_code in (401, 400):
+            return Response({'detail': 'Credenciais inválidas.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not resp.ok:
+            return Response({'detail': 'Erro ao autenticar.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        data = resp.json()
+        return Response({
+            'access': data['access_token'],
+            'refresh': data['refresh_token'],
+        })
 
 
 class MeView(generics.RetrieveUpdateAPIView):

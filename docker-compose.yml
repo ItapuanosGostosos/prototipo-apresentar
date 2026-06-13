@@ -11,6 +11,12 @@ services:
     volumes:
       - keycloak_data:/opt/keycloak/data
       - ./keycloak:/opt/keycloak/data/import
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/8080'"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
 
   rabbitmq:
     image: rabbitmq:3.13-management
@@ -36,6 +42,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+      keycloak:
+        condition: service_healthy
     environment:
       - DEBUG=True
       - SECRET_KEY=minha-chave-secreta-muito-louca
@@ -55,6 +63,12 @@ services:
     command: >
       bash -c "python manage.py migrate &&
                gunicorn --bind 0.0.0.0:8000 portifolio_tracker_api.wsgi:application"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/8000'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   celery-worker:
     build: .
@@ -62,6 +76,8 @@ services:
     restart: always
     depends_on:
       rabbitmq:
+        condition: service_healthy
+      api:
         condition: service_healthy
     environment:
       - DEBUG=True
@@ -84,6 +100,8 @@ services:
     restart: always
     depends_on:
       rabbitmq:
+        condition: service_healthy
+      api:
         condition: service_healthy
     environment:
       - DEBUG=True

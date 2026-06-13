@@ -1,6 +1,19 @@
 from django.db import models
 
 
+class Analysis(models.Model):
+    """Sentiment analysis produced by IA over a news article."""
+    article = models.ForeignKey('NewsArticle', on_delete=models.CASCADE, related_name='analyses')
+    analise = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'analises'
+
+    def __str__(self):
+        return f'Analysis #{self.pk} for article #{self.article_id}'
+
+
 class NewsSource(models.Model):
     """Registry of news sources/integrations. Add a new row to plug a new hub."""
     name = models.CharField(max_length=100)
