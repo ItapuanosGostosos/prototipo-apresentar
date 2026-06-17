@@ -4,6 +4,7 @@ from celery import shared_task
 
 from .fetchers.registry import get_fetcher
 from .models import NewsArticle, NewsSource
+from notifications.tasks import send_push_for_article
 from portfolios.models import Asset
 
 logger = logging.getLogger(__name__)

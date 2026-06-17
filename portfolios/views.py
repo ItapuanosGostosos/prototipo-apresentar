@@ -1,11 +1,18 @@
+import logging
+
 from django.db import IntegrityError
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from news.fetchers.yfinance_fetcher import YFinanceFetcher
+from news.models import Analysis, NewsArticle, NewsSource
+from news.serializers import AnalysisSerializer
 from .models import Asset, Portfolio
 from .serializers import AssetSerializer, PortfolioListSerializer, PortfolioSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class PortfolioListCreateView(generics.ListCreateAPIView):
@@ -61,3 +68,102 @@ class AssetDetailView(generics.RetrieveDestroyAPIView):
         except Portfolio.DoesNotExist:
             raise NotFound('Portfolio not found.')
         return Asset.objects.filter(portfolio=portfolio)
+
+
+_yfinance_fetcher = YFinanceFetcher()
+
+
+class PortfolioAnalyseView(APIView):
+    """POST: fetch latest news for the portfolio assets, save to DB and queue sentiment analysis."""
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def _get_portfolio(self, user, pk):
+        try:
+            return Portfolio.objects.get(pk=pk, user=user)
+        except Portfolio.DoesNotExist:
+            raise NotFound('Portfolio not found.')
+
+    def post(self, request, portfolio_pk):
+        from sentiment_ai.services import request_analysis
+
+        portfolio = self._get_portfolio(request.user, portfolio_pk)
+        tickers = list(portfolio.assets.values_list('ticker', flat=True).distinct())
+
+        if not tickers:
+            return Response(
+                {'detail': 'A carteira não possui ativos para analisar.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        source, _ = NewsSource.objects.get_or_create(
+            slug='yfinance',
+            defaults={'name': 'Yahoo Finance', 'is_active': True},
+        )
+
+        try:
+            fetched = _yfinance_fetcher.fetch(tickers)
+        except Exception as exc:
+            logger.error('Falha ao buscar noticias para analise: %s', exc)
+            fetched = []
+
+        tickers_set = set(t.upper() for t in tickers)
+        articles_queued = 0
+
+        for article in fetched:
+            obj, _ = NewsArticle.objects.get_or_create(
+                url=article.url,
+                defaults={
+                    'source': source,
+                    'title': article.title,
+                    'summary': article.summary or '',
+                    'thumbnail_url': article.thumbnail_url or '',
+                    'published_at': article.published_at,
+                },
+            )
+            # Link article to matching assets for news display (signal may or may not fire)
+            related_assets = Asset.objects.filter(ticker__in=article.related_tickers)
+            if related_assets.exists():
+                obj.tickers.add(*related_assets)
+
+            # Directly request analysis for each matching ticker (idempotent — won't duplicate)
+            for ticker in article.related_tickers:
+                if ticker.upper() in tickers_set:
+                    try:
+                        request_analysis(article_id=obj.pk, ticker=ticker)
+                        articles_queued += 1
+                    except Exception as exc:
+                        logger.error('Erro ao criar analise para %s: %s', ticker, exc)
+
+        analyses = (
+            Analysis.objects.filter(ticker__in=tickers)
+            .select_related('article')
+            .order_by('-created_at')[:50]
+        )
+        return Response(
+            {
+                'articles_queued': articles_queued,
+                'analyses': AnalysisSerializer(analyses, many=True).data,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class PortfolioAnalysisListView(generics.ListAPIView):
+    """GET: list all sentiment analyses for the tickers in a portfolio."""
+    serializer_class = AnalysisSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        try:
+            portfolio = Portfolio.objects.get(
+                pk=self.kwargs['portfolio_pk'], user=self.request.user
+            )
+        except Portfolio.DoesNotExist:
+            raise NotFound('Portfolio not found.')
+
+        tickers = list(portfolio.assets.values_list('ticker', flat=True).distinct())
+        return (
+            Analysis.objects.filter(ticker__in=tickers)
+            .select_related('article')
+            .order_by('-created_at')
+        )

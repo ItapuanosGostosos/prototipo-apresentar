@@ -40,7 +40,7 @@ class RegisterView(APIView):
             'username': data['username'],
             'email': data['email'],
             'firstName': data['username'],
-            'lastName': '',
+            'lastName': data['username'],
             'enabled': True,
             'emailVerified': True,
             'requiredActions': [],

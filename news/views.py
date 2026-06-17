@@ -1,13 +1,14 @@
 import logging
 
-from rest_framework import permissions
+from rest_framework import generics, permissions
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from portfolios.models import Asset, Portfolio
 from .fetchers.yfinance_fetcher import YFinanceFetcher
-from .serializers import LiveNewsArticleSerializer
+from .models import Analysis
+from .serializers import AnalysisSerializer, LiveNewsArticleSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -62,3 +63,16 @@ class PortfolioNewsListView(APIView):
         tickers = list(portfolio.assets.values_list('ticker', flat=True).distinct())
         articles = _fetch_live(tickers)
         return Response(LiveNewsArticleSerializer(articles, many=True).data)
+
+
+class AnalysisDetailView(generics.RetrieveAPIView):
+    """GET: retrieve a single sentiment analysis by ID."""
+    serializer_class = AnalysisSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        user = self.request.user
+        user_tickers = Asset.objects.filter(
+            portfolio__user=user
+        ).values_list('ticker', flat=True).distinct()
+        return Analysis.objects.filter(ticker__in=user_tickers).select_related('article')

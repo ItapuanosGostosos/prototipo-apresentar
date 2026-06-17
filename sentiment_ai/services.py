@@ -35,15 +35,22 @@ def request_analysis(article_id: int, ticker: str) -> Analysis:
     version = model_version()
 
     with transaction.atomic():
-        analysis = (
-            Analysis.objects.select_for_update()
-            .filter(
+        # Oracle does not allow LIMIT/OFFSET with SELECT FOR UPDATE, so we
+        # first retrieve the PK without a lock, then lock the specific row.
+        existing_id = (
+            Analysis.objects.filter(
                 article_id=article_id,
                 ticker=normalized_ticker,
                 model_version=version,
             )
             .order_by("id")
+            .values_list("id", flat=True)
             .first()
+        )
+        analysis = (
+            Analysis.objects.select_for_update().get(pk=existing_id)
+            if existing_id
+            else None
         )
 
         created = analysis is None
