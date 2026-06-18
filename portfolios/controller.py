@@ -8,9 +8,9 @@ from rest_framework.views import APIView
 
 from news.fetchers.yfinance_fetcher import YFinanceFetcher
 from news.models import Analysis, NewsArticle, NewsSource
-from news.serializers import AnalysisSerializer
+from news.dto import AnalysisSerializer
 from .models import Asset, Portfolio
-from .serializers import AssetSerializer, PortfolioListSerializer, PortfolioSerializer
+from .dto import AssetSerializer, PortfolioListSerializer, PortfolioSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -120,12 +120,10 @@ class PortfolioAnalyseView(APIView):
                     'published_at': article.published_at,
                 },
             )
-            # Link article to matching assets for news display (signal may or may not fire)
             related_assets = Asset.objects.filter(ticker__in=article.related_tickers)
             if related_assets.exists():
                 obj.tickers.add(*related_assets)
 
-            # Directly request analysis for each matching ticker (idempotent — won't duplicate)
             for ticker in article.related_tickers:
                 if ticker.upper() in tickers_set:
                     try:

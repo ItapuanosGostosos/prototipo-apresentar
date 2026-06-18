@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'news',
     'notifications',
     'sentiment_ai.apps.SentimentAIConfig',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -104,11 +105,24 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.JSONParser',
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'core.authentication.KeycloakAuthentication',
+        'core.security.KeycloakAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Portfolio Tracker API',
+    'DESCRIPTION': 'API para gerenciamento de carteiras de investimentos com análise de sentimentos de notícias.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SECURITY': [{'bearerAuth': []}],
+    'SWAGGER_UI_SETTINGS': {
+        'persistAuthorization': True,
+    },
 }
 
 KEYCLOAK_SERVER_URL = env('KEYCLOAK_SERVER_URL', default='http://localhost:8080')

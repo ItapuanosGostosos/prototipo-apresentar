@@ -89,5 +89,6 @@ webencodings==0.5.1
 websockets==13.1
 yfinance==1.2.0
 gunicorn==21.2.0
+drf-spectacular==0.29.0
 
 

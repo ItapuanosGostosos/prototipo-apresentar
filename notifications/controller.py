@@ -2,7 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 
 from .models import DeviceToken
-from .serializers import DeviceTokenSerializer
+from .dto import DeviceTokenSerializer
 
 
 class DeviceTokenView(generics.GenericAPIView):

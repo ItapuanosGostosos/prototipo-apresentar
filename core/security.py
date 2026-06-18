@@ -11,6 +11,9 @@ User = get_user_model()
 class KeycloakAuthentication(authentication.BaseAuthentication):
     keyword = 'Bearer'
 
+    def authenticate_header(self, request):
+        return self.keyword
+
     def get_jwks(self):
         try:
             response = requests.get(settings.KEYCLOAK_JWKS_URL, timeout=5)

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import AnalysisDetailView, GlobalNewsListView, PortfolioNewsListView
+from .controller import AnalysisDetailView, GlobalNewsListView, PortfolioNewsListView
 
 urlpatterns = [
     path('', GlobalNewsListView.as_view(), name='news-global'),

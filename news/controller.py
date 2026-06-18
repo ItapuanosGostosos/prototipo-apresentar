@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from portfolios.models import Asset, Portfolio
 from .fetchers.yfinance_fetcher import YFinanceFetcher
 from .models import Analysis
-from .serializers import AnalysisSerializer, LiveNewsArticleSerializer
+from .dto import AnalysisSerializer, LiveNewsArticleSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,6 @@ def _fetch_live(tickers: list[str]) -> list:
         if articles:
             return articles
 
-    # Nenhum resultado para os tickers do usuário — retorna feed geral
     return _do_fetch(FALLBACK_TICKERS)
 
 
