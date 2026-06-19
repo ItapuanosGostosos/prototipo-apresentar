@@ -52,7 +52,7 @@ services:
       - DB_PASSWORD=121104
       - DB_HOST=oracle.fiap.com.br
       - DB_PORT=1521
-      - ALLOWED_HOSTS=localhost,127.0.0.1,192.168.15.38,api
+      - ALLOWED_HOSTS=*
       - KEYCLOAK_SERVER_URL=http://keycloak:8080
       - KEYCLOAK_REALM=portfolio
       - KEYCLOAK_CLIENT_ID=portfolio-api

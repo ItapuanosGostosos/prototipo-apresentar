@@ -1,9 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-const KEYCLOAK_REALM = 'portfolio';
-const KEYCLOAK_CLIENT_ID = 'portfolio-api';
-
 function getHost(): string {
   const hostUri = Constants.expoConfig?.hostUri;
   return hostUri ? hostUri.split(':')[0] : 'localhost';
@@ -11,10 +8,6 @@ function getHost(): string {
 
 export function getApiBaseUrl(): string {
   return `http://${getHost()}:8000/api`;
-}
-
-export function getKeycloakTokenUrl(): string {
-  return `http://${getHost()}:8080/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`;
 }
 
 export const API_BASE_URL = getApiBaseUrl();
@@ -45,14 +38,10 @@ async function refreshAccessToken(): Promise<string | null> {
   const refresh = await tokenStorage.getRefresh();
   if (!refresh) return null;
 
-  const res = await fetch(getKeycloakTokenUrl(), {
+  const res = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      client_id: KEYCLOAK_CLIENT_ID,
-      refresh_token: refresh,
-    }).toString(),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh }),
   });
 
   if (!res.ok) {
@@ -61,8 +50,8 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 
   const data = await res.json();
-  await tokenStorage.set(data.access_token, data.refresh_token);
-  return data.access_token;
+  await tokenStorage.set(data.access, data.refresh);
+  return data.access;
 }
 
 export async function apiFetch<T>(

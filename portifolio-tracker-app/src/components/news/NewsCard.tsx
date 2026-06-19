@@ -1,4 +1,12 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  Linking,
+  ActivityIndicator,
+} from 'react-native';
 import type { NewsArticle } from '../../types';
 
 function formatDate(dateStr: string): string {
@@ -13,9 +21,11 @@ function formatDate(dateStr: string): string {
 
 interface NewsCardProps {
   article: NewsArticle;
+  onAnalyse?: () => void;
+  analysisPending?: boolean;
 }
 
-export function NewsCard({ article }: NewsCardProps) {
+export function NewsCard({ article, onAnalyse, analysisPending }: NewsCardProps) {
   function handleOpen() {
     Linking.openURL(article.url);
   }
@@ -56,6 +66,21 @@ export function NewsCard({ article }: NewsCardProps) {
               </View>
             ))}
           </View>
+        )}
+
+        {onAnalyse && (
+          <TouchableOpacity
+            style={[styles.analyseButton, analysisPending && styles.analyseButtonPending]}
+            onPress={(e) => { e.stopPropagation?.(); onAnalyse(); }}
+            disabled={analysisPending}
+            activeOpacity={0.7}
+          >
+            {analysisPending ? (
+              <ActivityIndicator size="small" color="#818cf8" />
+            ) : (
+              <Text style={styles.analyseButtonText}>Analisar com IA</Text>
+            )}
+          </TouchableOpacity>
         )}
       </View>
     </TouchableOpacity>
@@ -126,6 +151,26 @@ const styles = StyleSheet.create({
   tickerText: {
     color: '#94a3b8',
     fontSize: 11,
+    fontWeight: '600',
+  },
+  analyseButton: {
+    marginTop: 12,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#4338ca',
+    backgroundColor: '#1e1b4b',
+    alignSelf: 'flex-start',
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  analyseButtonPending: {
+    opacity: 0.6,
+  },
+  analyseButtonText: {
+    color: '#818cf8',
+    fontSize: 12,
     fontWeight: '600',
   },
 });

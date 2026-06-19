@@ -63,6 +63,33 @@ class LoginView(APIView):
         })
 
 
+class RefreshView(APIView):
+    """Proxies refresh token to Keycloak and returns new access + refresh tokens."""
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request):
+        refresh_token = request.data.get('refresh', '')
+        if not refresh_token:
+            return Response({'detail': 'Refresh token é obrigatório.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            resp = KeycloakService.refresh(refresh_token)
+        except Exception:
+            return Response(
+                {'detail': 'Não foi possível conectar ao servidor de autenticação.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if not resp.ok:
+            return Response({'detail': 'Token de atualização inválido ou expirado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        data = resp.json()
+        return Response({
+            'access': data['access_token'],
+            'refresh': data['refresh_token'],
+        })
+
+
 class MeView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
     permission_classes = (permissions.IsAuthenticated,)

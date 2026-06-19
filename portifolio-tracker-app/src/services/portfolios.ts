@@ -10,7 +10,7 @@ import type {
 // ─── Portfolios ──────────────────────────────────────────────────────────────
 
 export async function listPortfolios(): Promise<PortfolioListItem[]> {
-  return apiFetch<PortfolioListItem[]>('/portfolios');
+  return apiFetch<PortfolioListItem[]>('/portfolios/');
 }
 
 export async function getPortfolio(id: number): Promise<Portfolio> {
@@ -20,7 +20,7 @@ export async function getPortfolio(id: number): Promise<Portfolio> {
 export async function createPortfolio(
   payload: CreatePortfolioPayload,
 ): Promise<Portfolio> {
-  return apiFetch<Portfolio>('/portfolios', {
+  return apiFetch<Portfolio>('/portfolios/', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

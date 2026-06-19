@@ -40,3 +40,12 @@ class KeycloakService:
             'username': email,
             'password': password,
         }, timeout=10)
+
+    @staticmethod
+    def refresh(refresh_token: str) -> requests.Response:
+        url = f"{settings.KEYCLOAK_SERVER_URL}/realms/{settings.KEYCLOAK_REALM}/protocol/openid-connect/token"
+        return requests.post(url, data={
+            'grant_type': 'refresh_token',
+            'client_id': settings.KEYCLOAK_CLIENT_ID,
+            'refresh_token': refresh_token,
+        }, timeout=10)
