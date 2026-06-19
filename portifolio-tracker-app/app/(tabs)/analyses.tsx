@@ -1,411 +1,274 @@
 import { useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  Alert,
-  Linking,
+  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  ActivityIndicator, RefreshControl, ScrollView, Alert, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { C } from '../../src/theme';
+import { DecoBackground } from '../../src/components/ui/DecoBackground';
 import { listPortfolios } from '../../src/services/portfolios';
 import { listAnalyses, analysePortfolio } from '../../src/services/analyses';
 import type { Analysis, PortfolioListItem, SentimentLabel } from '../../src/types';
 
-const SENTIMENT_CONFIG: Record<
-  SentimentLabel,
-  { label: string; color: string; bg: string; border: string }
-> = {
-  positive: { label: 'Positivo', color: '#4ade80', bg: '#052e16', border: '#166534' },
-  negative: { label: 'Negativo', color: '#f87171', bg: '#2d0707', border: '#7f1d1d' },
-  neutral:  { label: 'Neutro',   color: '#fbbf24', bg: '#1c1407', border: '#713f12' },
+const SENT: Record<SentimentLabel, { label: string; color: string; bg: string }> = {
+  positive: { label: 'Positivo', color: '#4ade80', bg: '#052e16' },
+  negative: { label: 'Negativo', color: '#f87171', bg: '#2d0707' },
+  neutral:  { label: 'Neutro',   color: '#fbbf24', bg: '#1c1407' },
 };
 
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+const STATUS: Record<string, { label: string; color: string }> = {
   completed:  { label: 'Concluído',   color: '#4ade80' },
   pending:    { label: 'Pendente',     color: '#fbbf24' },
   processing: { label: 'Processando', color: '#60a5fa' },
-  failed:     { label: 'Falhou',       color: '#f87171' },
+  failed:     { label: 'Falhou',      color: '#f87171' },
 };
 
-function formatDate(dateStr: string | null): string {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+const TIME_FILTERS = ['1S', '1M', '3M', '6M', '1A'];
 
-function ImpactBar({ score }: { score: number }) {
+function ScoreBar({ score }: { score: number }) {
   const pct = Math.min(Math.max(score, 0), 1);
   const color = pct >= 0.6 ? '#4ade80' : pct >= 0.35 ? '#fbbf24' : '#f87171';
   return (
-    <View style={barStyles.wrapper}>
-      <View style={[barStyles.fill, { width: `${Math.round(pct * 100)}%` as any, backgroundColor: color }]} />
+    <View style={b.wrap}>
+      <View style={[b.fill, { width: `${Math.round(pct * 100)}%` as any, backgroundColor: color }]} />
     </View>
   );
 }
-
-const barStyles = StyleSheet.create({
-  wrapper: {
-    height: 4,
-    backgroundColor: '#334155',
-    borderRadius: 2,
-    overflow: 'hidden',
-    flex: 1,
-  },
+const b = StyleSheet.create({
+  wrap: { flex: 1, height: 4, backgroundColor: C.border, borderRadius: 2, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 2 },
 });
 
 function AnalysisCard({ item }: { item: Analysis }) {
-  const sentiment = item.result?.sentiment_label;
-  const sentConf = sentiment ? SENTIMENT_CONFIG[sentiment] : null;
-  const statusConf = STATUS_CONFIG[item.status] ?? { label: item.status, color: '#94a3b8' };
-
-  function openArticle() {
-    if (item.article_url) Linking.openURL(item.article_url);
-  }
+  const sent = item.result?.sentiment_label;
+  const sc   = sent ? SENT[sent] : null;
+  const st   = STATUS[item.status] ?? { label: item.status, color: C.textMuted };
 
   return (
-    <View style={cardStyles.card}>
-      {/* Row: ticker + status + sentiment */}
-      <View style={cardStyles.topRow}>
-        <View style={cardStyles.tickerBadge}>
-          <Text style={cardStyles.tickerText}>{item.ticker}</Text>
-        </View>
-        <Text style={[cardStyles.statusText, { color: statusConf.color }]}>
-          {statusConf.label}
-        </Text>
-        {sentConf && (
-          <View style={[cardStyles.sentimentBadge, { backgroundColor: sentConf.bg, borderColor: sentConf.border }]}>
-            <Text style={[cardStyles.sentimentText, { color: sentConf.color }]}>
-              {sentConf.label}
-            </Text>
+    <View style={s.card}>
+      <View style={s.cardTop}>
+        <View style={s.tickerBadge}><Text style={s.tickerText}>{item.ticker}</Text></View>
+        <Text style={[s.statusText, { color: st.color }]}>{st.label}</Text>
+        {sc && (
+          <View style={[s.sentBadge, { backgroundColor: sc.bg }]}>
+            <Text style={[s.sentText, { color: sc.color }]}>{sc.label}</Text>
           </View>
         )}
       </View>
 
-      {/* Article title */}
-      <TouchableOpacity onPress={openArticle} activeOpacity={0.7}>
-        <Text style={cardStyles.articleTitle} numberOfLines={2}>
-          {item.article_title}
-        </Text>
+      <TouchableOpacity onPress={() => item.article_url && Linking.openURL(item.article_url)}>
+        <Text style={s.articleTitle} numberOfLines={2}>{item.article_title}</Text>
       </TouchableOpacity>
 
-      {/* Impact score */}
       {item.result && (
         <>
-          <View style={cardStyles.impactRow}>
-            <Text style={cardStyles.impactLabel}>Impacto</Text>
-            <ImpactBar score={item.result.impact_score} />
-            <Text style={cardStyles.impactValue}>
-              {(item.result.impact_score * 100).toFixed(0)}%
-            </Text>
+          <View style={s.impactRow}>
+            <Text style={s.impactLabel}>Impacto</Text>
+            <ScoreBar score={item.result.impact_score} />
+            <Text style={s.impactValue}>{(item.result.impact_score * 100).toFixed(0)}%</Text>
           </View>
-
-          {/* Explanation */}
-          <Text style={cardStyles.explanation} numberOfLines={3}>
-            {item.result.explanation}
-          </Text>
-
-          {/* Signals */}
+          <Text style={s.explanation} numberOfLines={3}>{item.result.explanation}</Text>
           {(item.result.positive_signals.length > 0 || item.result.negative_signals.length > 0) && (
-            <View style={cardStyles.signalsRow}>
-              {item.result.positive_signals.map((s) => (
-                <View key={s} style={cardStyles.signalPos}>
-                  <Text style={cardStyles.signalPosText}>{s.replace('word:', '')}</Text>
-                </View>
+            <View style={s.signals}>
+              {item.result.positive_signals.map((sg) => (
+                <View key={sg} style={s.sigPos}><Text style={s.sigPosText}>{sg.replace('word:', '')}</Text></View>
               ))}
-              {item.result.negative_signals.map((s) => (
-                <View key={s} style={cardStyles.signalNeg}>
-                  <Text style={cardStyles.signalNegText}>{s.replace('word:', '')}</Text>
-                </View>
+              {item.result.negative_signals.map((sg) => (
+                <View key={sg} style={s.sigNeg}><Text style={s.sigNegText}>{sg.replace('word:', '')}</Text></View>
               ))}
             </View>
           )}
-
-          {/* Topics */}
           {item.result.detected_topics.length > 0 && (
-            <View style={cardStyles.topicsRow}>
+            <View style={s.topics}>
               {item.result.detected_topics.map((t) => (
-                <View key={t} style={cardStyles.topicBadge}>
-                  <Text style={cardStyles.topicText}>{t}</Text>
-                </View>
+                <View key={t} style={s.topic}><Text style={s.topicText}>{t}</Text></View>
               ))}
             </View>
           )}
         </>
       )}
 
-      {/* Footer */}
-      <Text style={cardStyles.date}>
-        {item.status === 'completed' ? `Concluído em ${formatDate(item.finished_at)}` : formatDate(item.created_at)}
+      <Text style={s.dateText}>
+        {item.status === 'completed' && item.finished_at
+          ? new Date(item.finished_at).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+          : new Date(item.created_at).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })}
       </Text>
     </View>
   );
 }
 
-const cardStyles = StyleSheet.create({
-  card: {
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 12,
-    gap: 8,
-  },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tickerBadge: {
-    backgroundColor: '#0f172a',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-    borderColor: '#475569',
-  },
-  tickerText: { color: '#f1f5f9', fontSize: 12, fontWeight: '700' },
-  statusText: { fontSize: 11, fontWeight: '600' },
-  sentimentBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 1,
-    marginLeft: 'auto',
-  },
-  sentimentText: { fontSize: 11, fontWeight: '700' },
-  articleTitle: {
-    color: '#cbd5e1',
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 20,
-  },
-  impactRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  impactLabel: { color: '#64748b', fontSize: 11, fontWeight: '500' },
-  impactValue: { color: '#94a3b8', fontSize: 11, fontWeight: '600', minWidth: 28 },
-  explanation: { color: '#64748b', fontSize: 12, lineHeight: 18 },
-  signalsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  signalPos: {
-    backgroundColor: '#052e16',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: '#166534',
-  },
-  signalPosText: { color: '#4ade80', fontSize: 10, fontWeight: '600' },
-  signalNeg: {
-    backgroundColor: '#2d0707',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: '#7f1d1d',
-  },
-  signalNegText: { color: '#f87171', fontSize: 10, fontWeight: '600' },
-  topicsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  topicBadge: {
-    backgroundColor: '#1e1b4b',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: '#4338ca',
-  },
-  topicText: { color: '#818cf8', fontSize: 10, fontWeight: '600' },
-  date: { color: '#334155', fontSize: 11, marginTop: 2 },
-});
-
 export default function AnalysesScreen() {
   const qc = useQueryClient();
-  const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [timeFilter, setTimeFilter] = useState('1M');
 
-  const { data: portfolios, isLoading: loadingPortfolios } = useQuery({
-    queryKey: ['portfolios'],
-    queryFn: listPortfolios,
-  });
+  const { data: portfolios, isLoading: loadingP } = useQuery({ queryKey: ['portfolios'], queryFn: listPortfolios });
 
-  const {
-    data: analyses,
-    isLoading: loadingAnalyses,
-    refetch,
-    isRefetching,
-  } = useQuery({
-    queryKey: ['analyses', selectedPortfolioId],
-    queryFn: () => listAnalyses(selectedPortfolioId!),
-    enabled: selectedPortfolioId !== null,
+  const { data: analyses, isLoading, refetch, isRefetching } = useQuery({
+    queryKey: ['analyses', selectedId],
+    queryFn: () => listAnalyses(selectedId!),
+    enabled: selectedId !== null,
   });
 
   const analyseMutation = useMutation({
-    mutationFn: () => analysePortfolio(selectedPortfolioId!),
+    mutationFn: () => analysePortfolio(selectedId!),
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['analyses', selectedPortfolioId] });
-      Alert.alert(
-        'Análise iniciada',
-        `${data.articles_queued} artigos enfileirados. Os resultados aparecerão aqui em instantes.`,
-      );
+      qc.invalidateQueries({ queryKey: ['analyses', selectedId] });
+      Alert.alert('Análise iniciada', `${data.articles_queued} artigos enfileirados.\nAtualize em instantes.`);
     },
-    onError: (err: Error) => Alert.alert('Erro ao analisar', err.message),
+    onError: (e: Error) => Alert.alert('Erro', e.message),
   });
 
   const completed = (analyses ?? []).filter((a) => a.status === 'completed').length;
   const total = (analyses ?? []).length;
 
-  if (loadingPortfolios) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator color="#818cf8" size="large" />
-      </View>
-    );
-  }
+  if (loadingP) return <View style={[s.root, s.centered]}><ActivityIndicator color={C.accentLt} size="large" /></View>;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Análises de IA</Text>
-          {selectedPortfolioId && total > 0 && (
-            <Text style={styles.headerSub}>{completed}/{total} concluídas</Text>
+    <View style={s.root}>
+      <DecoBackground />
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* Header */}
+        <View style={s.header}>
+          <View>
+            <Text style={s.headerTitle}>Analytics</Text>
+            {selectedId && total > 0 && (
+              <Text style={s.headerSub}>{completed} de {total} concluídas</Text>
+            )}
+          </View>
+          {selectedId && (
+            <TouchableOpacity
+              style={[s.triggerBtn, analyseMutation.isPending && { opacity: 0.5 }]}
+              onPress={() => analyseMutation.mutate()}
+              disabled={analyseMutation.isPending}
+            >
+              {analyseMutation.isPending
+                ? <ActivityIndicator size="small" color={C.accentLt} />
+                : <>
+                    <Ionicons name="pulse" color={C.accentLt} size={14} />
+                    <Text style={s.triggerBtnText}>Analisar</Text>
+                  </>
+              }
+            </TouchableOpacity>
           )}
         </View>
-        {selectedPortfolioId && (
-          <TouchableOpacity
-            style={[styles.triggerButton, analyseMutation.isPending && styles.triggerButtonPending]}
-            onPress={() => analyseMutation.mutate()}
-            disabled={analyseMutation.isPending}
-          >
-            {analyseMutation.isPending ? (
-              <ActivityIndicator size="small" color="#818cf8" />
-            ) : (
-              <Text style={styles.triggerButtonText}>+ Analisar</Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
 
-      {/* Portfolio selector */}
-      {(portfolios ?? []).length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterRow}
-        >
-          {(portfolios ?? []).map((p: PortfolioListItem) => (
-            <TouchableOpacity
-              key={p.id}
-              style={[styles.chip, selectedPortfolioId === p.id && styles.chipActive]}
-              onPress={() => setSelectedPortfolioId(p.id)}
-            >
-              <Text style={[styles.chipText, selectedPortfolioId === p.id && styles.chipTextActive]}>
-                {p.name}
-              </Text>
+        {/* Time filters */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.timeScroll} contentContainerStyle={s.timeRow}>
+          {TIME_FILTERS.map((f) => (
+            <TouchableOpacity key={f} style={[s.timeChip, timeFilter === f && s.timeChipActive]} onPress={() => setTimeFilter(f)}>
+              <Text style={[s.timeChipText, timeFilter === f && s.timeChipTextActive]}>{f}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
-      )}
 
-      {/* Content */}
-      {!selectedPortfolioId ? (
-        <View style={styles.centered}>
-          <Text style={styles.placeholderEmoji}>🤖</Text>
-          <Text style={styles.placeholderText}>
-            Selecione um portfólio para ver as análises de sentimento geradas pela IA.
-          </Text>
-        </View>
-      ) : loadingAnalyses ? (
-        <View style={styles.centered}>
-          <ActivityIndicator color="#818cf8" size="large" />
-          <Text style={styles.loadingText}>Carregando análises...</Text>
-        </View>
-      ) : (analyses ?? []).length === 0 ? (
-        <View style={styles.centered}>
-          <Text style={styles.placeholderEmoji}>📊</Text>
-          <Text style={styles.placeholderText}>
-            Nenhuma análise ainda.{'\n'}Toque em "+ Analisar" para iniciar a análise de IA.
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={analyses}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.list}
-          renderItem={({ item }) => <AnalysisCard item={item} />}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetch}
-              tintColor="#818cf8"
-              colors={['#818cf8']}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </SafeAreaView>
+        {/* Portfolio selector */}
+        {(portfolios ?? []).length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll} contentContainerStyle={s.chipRow}>
+            {(portfolios ?? []).map((p: PortfolioListItem) => (
+              <TouchableOpacity
+                key={p.id}
+                style={[s.chip, selectedId === p.id && s.chipActive]}
+                onPress={() => setSelectedId(p.id)}
+              >
+                <Text style={[s.chipText, selectedId === p.id && s.chipTextActive]}>{p.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {!selectedId ? (
+          <View style={s.centered}>
+            <Text style={{ fontSize: 48, marginBottom: 12 }}>🤖</Text>
+            <Text style={s.emptyText}>Selecione um portfólio para ver as análises de sentimento.</Text>
+          </View>
+        ) : isLoading ? (
+          <View style={s.centered}><ActivityIndicator color={C.accentLt} size="large" /></View>
+        ) : !analyses?.length ? (
+          <View style={s.centered}>
+            <Text style={{ fontSize: 48, marginBottom: 12 }}>📊</Text>
+            <Text style={s.emptyText}>Nenhuma análise ainda.{'\n'}Toque em "Analisar" para iniciar.</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={analyses}
+            keyExtractor={(i) => String(i.id)}
+            contentContainerStyle={s.list}
+            renderItem={({ item }) => <AnalysisCard item={item} />}
+            refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={C.accentLt} colors={[C.accentLt]} />}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    backgroundColor: '#0f172a',
-  },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
+  emptyText: { color: C.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 22 },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8,
   },
-  headerTitle: { fontSize: 24, fontWeight: '700', color: '#f1f5f9' },
-  headerSub: { color: '#475569', fontSize: 12, marginTop: 2 },
-  triggerButton: {
-    backgroundColor: '#1e1b4b',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#4338ca',
-    minWidth: 90,
-    alignItems: 'center',
+  headerTitle: { color: C.text, fontSize: 24, fontWeight: '700' },
+  headerSub: { color: C.textMuted, fontSize: 12, marginTop: 2 },
+  triggerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: C.bgCard, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8,
+    borderWidth: 1, borderColor: C.border,
   },
-  triggerButtonPending: { opacity: 0.6 },
-  triggerButtonText: { color: '#818cf8', fontWeight: '600', fontSize: 14 },
-  filterScroll: { height: 48, marginBottom: 8 },
-  filterRow: {
-    paddingHorizontal: 20,
-    paddingRight: 20,
-    gap: 8,
-    alignItems: 'center',
+  triggerBtnText: { color: C.accentLt, fontWeight: '600', fontSize: 14 },
+
+  timeScroll: { height: 40, marginBottom: 4 },
+  timeRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center' },
+  timeChip: {
+    borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6,
+    backgroundColor: C.bgCard, borderWidth: 1, borderColor: C.border,
   },
+  timeChipActive: { backgroundColor: '#1e0d4e', borderColor: C.accent },
+  timeChipText: { color: C.textMuted, fontSize: 13, fontWeight: '600' },
+  timeChipTextActive: { color: C.accentLt },
+
+  chipScroll: { height: 44, marginBottom: 8 },
+  chipRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center' },
   chip: {
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: '#1e293b',
-    borderWidth: 1,
-    borderColor: '#334155',
+    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
+    backgroundColor: C.bgCard, borderWidth: 1, borderColor: C.border,
   },
-  chipActive: { backgroundColor: '#1e1b4b', borderColor: '#818cf8' },
-  chipText: { color: '#94a3b8', fontSize: 13, fontWeight: '500' },
-  chipTextActive: { color: '#818cf8', fontWeight: '600' },
-  list: { paddingHorizontal: 20, paddingBottom: 20 },
-  loadingText: { color: '#475569', fontSize: 14, marginTop: 12 },
-  placeholderEmoji: { fontSize: 48, marginBottom: 12 },
-  placeholderText: { color: '#475569', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  chipActive: { backgroundColor: '#1e0d4e', borderColor: C.accent },
+  chipText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
+  chipTextActive: { color: C.accentLt, fontWeight: '600' },
+
+  list: { paddingHorizontal: 20, paddingBottom: 24 },
+  card: {
+    backgroundColor: C.bgCard, borderRadius: 16, padding: 14,
+    borderWidth: 1, borderColor: C.border, marginBottom: 12, gap: 8,
+  },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tickerBadge: {
+    backgroundColor: C.bgCardLt, borderRadius: 6, paddingHorizontal: 8,
+    paddingVertical: 3, borderWidth: 1, borderColor: C.borderLt,
+  },
+  tickerText: { color: C.text, fontSize: 12, fontWeight: '700' },
+  statusText: { fontSize: 11, fontWeight: '600' },
+  sentBadge: { marginLeft: 'auto', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  sentText: { fontSize: 11, fontWeight: '700' },
+  articleTitle: { color: C.textSec, fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  impactRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  impactLabel: { color: C.textMuted, fontSize: 11 },
+  impactValue: { color: C.textMuted, fontSize: 11, fontWeight: '600', minWidth: 28 },
+  explanation: { color: C.textMuted, fontSize: 12, lineHeight: 18 },
+  signals: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  sigPos: { backgroundColor: '#052e16', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: '#166534' },
+  sigPosText: { color: '#4ade80', fontSize: 10, fontWeight: '600' },
+  sigNeg: { backgroundColor: '#2d0707', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: '#7f1d1d' },
+  sigNegText: { color: '#f87171', fontSize: 10, fontWeight: '600' },
+  topics: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  topic: { backgroundColor: '#1e0d4e', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: C.accent },
+  topicText: { color: C.accentLt, fontSize: 10, fontWeight: '600' },
+  dateText: { color: C.border, fontSize: 11, marginTop: 2 },
 });
