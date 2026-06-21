@@ -42,7 +42,7 @@ export default function RegisterScreen() {
             <View style={s.logoIcon}>
               <Text style={s.logoEmoji}>📈</Text>
             </View>
-            <Text style={s.appName}>TrendLens</Text>
+            <Text style={s.appName}>Portfolio Tracker</Text>
             <Text style={s.appSub}>Crie sua conta</Text>
           </View>
 

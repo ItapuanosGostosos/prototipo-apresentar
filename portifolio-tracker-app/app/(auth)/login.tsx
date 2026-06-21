@@ -38,7 +38,7 @@ export default function LoginScreen() {
             <View style={s.logoIcon}>
               <Text style={s.logoEmoji}>📈</Text>
             </View>
-            <Text style={s.appName}>TrendLens</Text>
+            <Text style={s.appName}>Portfolio Tracker</Text>
             <Text style={s.appSub}>by Portfolio Tracker</Text>
           </View>
 

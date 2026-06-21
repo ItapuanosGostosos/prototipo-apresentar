@@ -134,7 +134,7 @@ export default function HomeScreen() {
 
           {/* Suggestions */}
           <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Sugestões TrendLens</Text>
+            <Text style={s.sectionTitle}>Sugestões Portfolio Tracker</Text>
             <View style={s.sectionBadge}>
               <Text style={s.sectionBadgeText}>IA</Text>
             </View>
