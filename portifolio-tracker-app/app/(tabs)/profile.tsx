@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { C } from '../../src/theme';
 import { DecoBackground } from '../../src/components/ui/DecoBackground';
 import { useAuthStore } from '../../src/store/authStore';
@@ -14,6 +15,7 @@ const MENU_ITEMS = [
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
+  const router = useRouter();
   const username = user?.username || 'Usuário';
   const initial  = username[0]?.toUpperCase() ?? 'U';
 
@@ -45,7 +47,11 @@ export default function ProfileScreen() {
           {/* Menu */}
           <View style={s.menu}>
             {MENU_ITEMS.map((item) => (
-              <TouchableOpacity key={item.id} style={s.menuItem}>
+              <TouchableOpacity
+                key={item.id}
+                style={s.menuItem}
+                onPress={item.id === 'settings' ? () => router.push('/profile-settings') : undefined}
+              >
                 <View style={s.menuIconWrap}>
                   <Ionicons name={item.icon as any} color={C.accentLt} size={18} />
                 </View>

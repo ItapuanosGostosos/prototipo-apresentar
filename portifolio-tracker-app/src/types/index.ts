@@ -4,6 +4,17 @@ export interface User {
   id: number;
   email: string;
   username: string;
+  cpf?: string;
+}
+
+export interface UpdateProfilePayload {
+  username?: string;
+  cpf?: string;
+}
+
+export interface ChangePasswordPayload {
+  current_password: string;
+  new_password: string;
 }
 
 export interface LoginPayload {

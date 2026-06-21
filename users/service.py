@@ -49,3 +49,24 @@ class KeycloakService:
             'client_id': settings.KEYCLOAK_CLIENT_ID,
             'refresh_token': refresh_token,
         }, timeout=10)
+
+    @staticmethod
+    def get_user_id(email: str) -> str:
+        admin_token = KeycloakService.admin_token()
+        url = f"{settings.KEYCLOAK_SERVER_URL}/admin/realms/{settings.KEYCLOAK_REALM}/users"
+        resp = requests.get(url, params={'email': email, 'exact': 'true'},
+                            headers={'Authorization': f'Bearer {admin_token}'}, timeout=10)
+        resp.raise_for_status()
+        users = resp.json()
+        if not users:
+            raise ValueError('Usuário não encontrado no servidor de autenticação.')
+        return users[0]['id']
+
+    @staticmethod
+    def change_password(email: str, new_password: str) -> None:
+        user_id = KeycloakService.get_user_id(email)
+        admin_token = KeycloakService.admin_token()
+        url = f"{settings.KEYCLOAK_SERVER_URL}/admin/realms/{settings.KEYCLOAK_REALM}/users/{user_id}/reset-password"
+        resp = requests.put(url, json={'type': 'password', 'value': new_password, 'temporary': False},
+                            headers={'Authorization': f'Bearer {admin_token}'}, timeout=10)
+        resp.raise_for_status()

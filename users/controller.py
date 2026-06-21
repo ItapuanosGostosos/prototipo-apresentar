@@ -2,7 +2,7 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .dto import RegisterSerializer, UserSerializer
+from .dto import ChangePasswordSerializer, RegisterSerializer, UserSerializer
 from .service import KeycloakService
 
 
@@ -96,3 +96,30 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class ChangePasswordView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            resp = KeycloakService.login(request.user.email, data['current_password'])
+        except Exception:
+            return Response(
+                {'detail': 'Não foi possível conectar ao servidor de autenticação.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if not resp.ok:
+            return Response({'detail': 'Senha atual incorreta.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            KeycloakService.change_password(request.user.email, data['new_password'])
+        except Exception:
+            return Response({'detail': 'Erro ao alterar senha.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({'detail': 'Senha alterada com sucesso.'})
