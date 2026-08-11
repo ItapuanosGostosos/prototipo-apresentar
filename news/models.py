@@ -2,16 +2,32 @@ from django.db import models
 
 
 class Analysis(models.Model):
-    """Sentiment analysis produced by IA over a news article."""
+    """Sentiment-analysis request and result for one article and ticker."""
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pendente'
+        PROCESSING = 'processing', 'Processando'
+        COMPLETED = 'completed', 'Concluída'
+        FAILED = 'failed', 'Falhou'
+
     article = models.ForeignKey('NewsArticle', on_delete=models.CASCADE, related_name='analyses')
-    analise = models.TextField()
+    ticker = models.CharField(max_length=20, blank=True, default='', db_index=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    analise = models.TextField(blank=True, default='')
+    model_version = models.CharField(max_length=50, default='rules-v2.0.0')
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.TextField(blank=True, default='')
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'analises'
+        ordering = ['created_at', 'id']
 
     def __str__(self):
-        return f'Analysis #{self.pk} for article #{self.article_id}'
+        return f'Analysis #{self.pk} ({self.ticker or "sem ticker"}) - {self.status}'
 
 
 class NewsSource(models.Model):

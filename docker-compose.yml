@@ -52,7 +52,7 @@ services:
       - DB_PASSWORD=121104
       - DB_HOST=oracle.fiap.com.br
       - DB_PORT=1521
-      - ALLOWED_HOSTS=localhost,127.0.0.1,192.168.15.38,api
+      - ALLOWED_HOSTS=*
       - KEYCLOAK_SERVER_URL=http://keycloak:8080
       - KEYCLOAK_REALM=portfolio
       - KEYCLOAK_CLIENT_ID=portfolio-api
@@ -93,6 +93,37 @@ services:
       - CELERY_BROKER_URL=amqp://portfolio:portfolio123@rabbitmq:5672/
       - CELERY_RESULT_BACKEND=rpc://
     command: celery -A portifolio_tracker_api worker --loglevel=info
+
+  sentiment-worker:
+    build:
+      context: .
+      dockerfile: sentiment_ai/Dockerfile
+    container_name: portfolio_sentiment_worker
+    restart: always
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=minha-chave-secreta-muito-louca
+      - DB_NAME=orcl
+      - DB_USER=rm551157
+      - DB_PASSWORD=121104
+      - DB_HOST=oracle.fiap.com.br
+      - DB_PORT=1521
+      - KEYCLOAK_SERVER_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=portfolio
+      - KEYCLOAK_CLIENT_ID=portfolio-api
+      - CELERY_BROKER_URL=amqp://portfolio:portfolio123@rabbitmq:5672/
+      - CELERY_RESULT_BACKEND=rpc://
+    command: >
+      celery -A portifolio_tracker_api worker
+      --loglevel=info
+      -Q sentiment_analysis
+      --concurrency=1
+      --prefetch-multiplier=1
 
   celery-beat:
     build: .

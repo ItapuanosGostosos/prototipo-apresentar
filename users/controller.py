@@ -1,22 +1,9 @@
-import requests
-from django.conf import settings
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import RegisterSerializer, UserSerializer
-
-
-def _keycloak_admin_token() -> str:
-    url = f"{settings.KEYCLOAK_SERVER_URL}/realms/master/protocol/openid-connect/token"
-    resp = requests.post(url, data={
-        'grant_type': 'password',
-        'client_id': 'admin-cli',
-        'username': 'admin',
-        'password': 'admin',
-    }, timeout=10)
-    resp.raise_for_status()
-    return resp.json()['access_token']
+from .dto import ChangePasswordSerializer, RegisterSerializer, UserSerializer
+from .service import KeycloakService
 
 
 class RegisterView(APIView):
@@ -28,24 +15,12 @@ class RegisterView(APIView):
         data = serializer.validated_data
 
         try:
-            admin_token = _keycloak_admin_token()
+            resp = KeycloakService.register_user(data)
         except Exception:
             return Response(
                 {'detail': 'Não foi possível conectar ao servidor de autenticação.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-
-        url = f"{settings.KEYCLOAK_SERVER_URL}/admin/realms/{settings.KEYCLOAK_REALM}/users"
-        resp = requests.post(url, json={
-            'username': data['username'],
-            'email': data['email'],
-            'firstName': data['username'],
-            'lastName': '',
-            'enabled': True,
-            'emailVerified': True,
-            'requiredActions': [],
-            'credentials': [{'type': 'password', 'value': data['password'], 'temporary': False}],
-        }, headers={'Authorization': f'Bearer {admin_token}'}, timeout=10)
 
         if resp.status_code == 409:
             return Response({'detail': 'E-mail já cadastrado.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -67,14 +42,8 @@ class LoginView(APIView):
         if not email or not password:
             return Response({'detail': 'Email e senha são obrigatórios.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        url = f"{settings.KEYCLOAK_SERVER_URL}/realms/{settings.KEYCLOAK_REALM}/protocol/openid-connect/token"
         try:
-            resp = requests.post(url, data={
-                'grant_type': 'password',
-                'client_id': settings.KEYCLOAK_CLIENT_ID,
-                'username': email,
-                'password': password,
-            }, timeout=10)
+            resp = KeycloakService.login(email, password)
         except Exception:
             return Response(
                 {'detail': 'Não foi possível conectar ao servidor de autenticação.'},
@@ -94,9 +63,63 @@ class LoginView(APIView):
         })
 
 
+class RefreshView(APIView):
+    """Proxies refresh token to Keycloak and returns new access + refresh tokens."""
+    permission_classes = (permissions.AllowAny,)
+
+    def post(self, request):
+        refresh_token = request.data.get('refresh', '')
+        if not refresh_token:
+            return Response({'detail': 'Refresh token é obrigatório.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            resp = KeycloakService.refresh(refresh_token)
+        except Exception:
+            return Response(
+                {'detail': 'Não foi possível conectar ao servidor de autenticação.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if not resp.ok:
+            return Response({'detail': 'Token de atualização inválido ou expirado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        data = resp.json()
+        return Response({
+            'access': data['access_token'],
+            'refresh': data['refresh_token'],
+        })
+
+
 class MeView(generics.RetrieveUpdateAPIView):
     serializer_class = UserSerializer
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_object(self):
         return self.request.user
+
+
+class ChangePasswordView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            resp = KeycloakService.login(request.user.email, data['current_password'])
+        except Exception:
+            return Response(
+                {'detail': 'Não foi possível conectar ao servidor de autenticação.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if not resp.ok:
+            return Response({'detail': 'Senha atual incorreta.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            KeycloakService.change_password(request.user.email, data['new_password'])
+        except Exception:
+            return Response({'detail': 'Erro ao alterar senha.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({'detail': 'Senha alterada com sucesso.'})

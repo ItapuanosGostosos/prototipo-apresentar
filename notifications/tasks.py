@@ -13,7 +13,7 @@ def send_push_for_article(article_id: int):
     """
     from news.models import NewsArticle
     from .models import DeviceToken, NotificationLog
-    from .services import FCMService
+    from .service import FCMService
 
     try:
         article = NewsArticle.objects.prefetch_related('tickers__portfolio__user').get(pk=article_id)

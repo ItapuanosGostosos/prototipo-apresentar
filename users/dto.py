@@ -8,6 +8,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('id', 'email', 'username', 'cpf')
+        read_only_fields = ('id', 'email')
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -15,3 +16,8 @@ class RegisterSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     cpf = serializers.CharField(max_length=14, required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, min_length=6)
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=6)

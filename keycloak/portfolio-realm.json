@@ -4,6 +4,9 @@
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
+  "attributes": {
+    "userProfileEnabled": "false"
+  },
   "clients": [
     {
       "clientId": "portfolio-api",

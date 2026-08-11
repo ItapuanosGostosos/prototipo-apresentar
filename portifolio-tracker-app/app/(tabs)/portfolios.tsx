@@ -1,507 +1,335 @@
 import { useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-  TextInput,
-  Modal,
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  TouchableWithoutFeedback,
-  KeyboardAvoidingView,
-  Platform,
+  View, Text, TouchableOpacity, StyleSheet, FlatList, TextInput,
+  Modal, ActivityIndicator, Alert, ScrollView,
+  TouchableWithoutFeedback, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { C } from '../../src/theme';
+import { DecoBackground } from '../../src/components/ui/DecoBackground';
 import {
-  listPortfolios,
-  getPortfolio,
-  createPortfolio,
-  deletePortfolio,
-  addAsset,
-  removeAsset,
+  listPortfolios, getPortfolio, createPortfolio,
+  deletePortfolio, addAsset, removeAsset,
 } from '../../src/services/portfolios';
-import { AssetTypeTag } from '../../src/components/portfolio/AssetTypeTag';
 import type { AssetType, PortfolioListItem } from '../../src/types';
 
-const ASSET_TYPES: { value: AssetType; label: string }[] = [
-  { value: 'stock', label: 'Ação' },
-  { value: 'fii', label: 'FII' },
-  { value: 'crypto', label: 'Cripto' },
-  { value: 'etf', label: 'ETF' },
-  { value: 'bdr', label: 'BDR' },
+const ASSET_TYPES: { value: AssetType; label: string; icon: string }[] = [
+  { value: 'stock', label: 'Ação',   icon: '📈' },
+  { value: 'fii',   label: 'FII',    icon: '🏢' },
+  { value: 'crypto',label: 'Cripto', icon: '₿' },
+  { value: 'etf',   label: 'ETF',    icon: '📦' },
+  { value: 'bdr',   label: 'BDR',    icon: '🌎' },
 ];
+
+const TYPE_COLORS: Record<AssetType, { bg: string; text: string }> = {
+  stock:  { bg: '#1e3a5f', text: '#60a5fa' },
+  fii:    { bg: '#1a3a2a', text: '#4ade80' },
+  crypto: { bg: '#2d1b4e', text: '#c084fc' },
+  etf:    { bg: '#3a2a0a', text: '#fbbf24' },
+  bdr:    { bg: '#1e2a40', text: '#38bdf8' },
+};
 
 export default function PortfoliosScreen() {
   const qc = useQueryClient();
-  const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | null>(null);
-  const [showCreatePortfolio, setShowCreatePortfolio] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const [showAddAsset, setShowAddAsset] = useState(false);
-  const [newPortfolioName, setNewPortfolioName] = useState('');
-  const [assetTicker, setAssetTicker] = useState('');
+  const [newName, setNewName] = useState('');
+  const [ticker, setTicker] = useState('');
   const [assetName, setAssetName] = useState('');
   const [assetType, setAssetType] = useState<AssetType>('stock');
 
-  // Listagem de portfólios
-  const { data: portfolios, isLoading: loadingPortfolios } = useQuery({
-    queryKey: ['portfolios'],
-    queryFn: listPortfolios,
+  const { data: portfolios, isLoading } = useQuery({ queryKey: ['portfolios'], queryFn: listPortfolios });
+  const { data: detail, isLoading: loadingDetail } = useQuery({
+    queryKey: ['portfolio', selectedId],
+    queryFn: () => getPortfolio(selectedId!),
+    enabled: selectedId !== null,
   });
 
-  // Detalhe do portfólio selecionado (com ativos)
-  const { data: selectedPortfolio, isLoading: loadingDetail } = useQuery({
-    queryKey: ['portfolio', selectedPortfolioId],
-    queryFn: () => getPortfolio(selectedPortfolioId!),
-    enabled: selectedPortfolioId !== null,
-  });
-
-  const createPortfolioMutation = useMutation({
+  const createMutation = useMutation({
     mutationFn: (name: string) => createPortfolio({ name }),
-    onSuccess: (portfolio) => {
-      qc.invalidateQueries({ queryKey: ['portfolios'] });
-      setShowCreatePortfolio(false);
-      setNewPortfolioName('');
-      setSelectedPortfolioId(portfolio.id);
-    },
-    onError: (err: Error) => Alert.alert('Erro', err.message),
+    onSuccess: (p) => { qc.invalidateQueries({ queryKey: ['portfolios'] }); setShowCreate(false); setNewName(''); setSelectedId(p.id); },
+    onError: (e: Error) => Alert.alert('Erro', e.message),
   });
 
-  const deletePortfolioMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: deletePortfolio,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['portfolios'] });
-      setSelectedPortfolioId(null);
-    },
-    onError: (err: Error) => Alert.alert('Erro', err.message),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['portfolios'] }); setSelectedId(null); },
+    onError: (e: Error) => Alert.alert('Erro', e.message),
   });
 
-  const addAssetMutation = useMutation({
-    mutationFn: () =>
-      addAsset(selectedPortfolioId!, {
-        ticker: assetTicker.trim().toUpperCase(),
-        name: assetName.trim(),
-        asset_type: assetType,
-      }),
+  const addMutation = useMutation({
+    mutationFn: () => addAsset(selectedId!, { ticker: ticker.trim().toUpperCase(), name: assetName.trim(), asset_type: assetType }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['portfolio', selectedPortfolioId] });
+      qc.invalidateQueries({ queryKey: ['portfolio', selectedId] });
       qc.invalidateQueries({ queryKey: ['portfolios'] });
-      setShowAddAsset(false);
-      setAssetTicker('');
-      setAssetName('');
-      setAssetType('stock');
+      setShowAddAsset(false); setTicker(''); setAssetName(''); setAssetType('stock');
     },
-    onError: (err: Error) => Alert.alert('Erro', err.message),
+    onError: (e: Error) => Alert.alert('Erro', e.message),
   });
 
-  const removeAssetMutation = useMutation({
-    mutationFn: (assetId: number) => removeAsset(selectedPortfolioId!, assetId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['portfolio', selectedPortfolioId] });
-      qc.invalidateQueries({ queryKey: ['portfolios'] });
-    },
-    onError: (err: Error) => Alert.alert('Erro', err.message),
+  const removeMutation = useMutation({
+    mutationFn: (assetId: number) => removeAsset(selectedId!, assetId),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['portfolio', selectedId] }); qc.invalidateQueries({ queryKey: ['portfolios'] }); },
+    onError: (e: Error) => Alert.alert('Erro', e.message),
   });
 
-  function confirmDeletePortfolio(id: number, name: string) {
-    Alert.alert(
-      'Excluir portfólio',
-      `Deseja excluir "${name}"? Esta ação não pode ser desfeita.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Excluir', style: 'destructive', onPress: () => deletePortfolioMutation.mutate(id) },
-      ],
-    );
-  }
-
-  function confirmRemoveAsset(assetId: number, ticker: string) {
-    Alert.alert(
-      'Remover ativo',
-      `Deseja remover ${ticker} do portfólio?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Remover', style: 'destructive', onPress: () => removeAssetMutation.mutate(assetId) },
-      ],
-    );
-  }
-
-  // ─── Render ───────────────────────────────────────────────────────────────
-
-  if (loadingPortfolios) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator color="#818cf8" size="large" />
-      </View>
-    );
+  if (isLoading) {
+    return <View style={[s.root, s.centered]}><ActivityIndicator color={C.accentLt} size="large" /></View>;
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Portfólios</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowCreatePortfolio(true)}
-        >
-          <Text style={styles.addButtonText}>+ Novo</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Lista de portfólios */}
-      <FlatList
-        data={portfolios ?? []}
-        keyExtractor={(item) => String(item.id)}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.portfolioList}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>Nenhum portfólio criado.</Text>
-        }
-        renderItem={({ item }: { item: PortfolioListItem }) => (
-          <TouchableOpacity
-            style={[
-              styles.portfolioChip,
-              selectedPortfolioId === item.id && styles.portfolioChipActive,
-            ]}
-            onPress={() => setSelectedPortfolioId(item.id)}
-            onLongPress={() => confirmDeletePortfolio(item.id, item.name)}
-          >
-            <Text
-              style={[
-                styles.portfolioChipText,
-                selectedPortfolioId === item.id && styles.portfolioChipTextActive,
-              ]}
-            >
-              {item.name}
-            </Text>
-            <Text style={styles.portfolioChipCount}>{item.asset_count} ativos</Text>
+    <View style={s.root}>
+      <DecoBackground />
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* Header */}
+        <View style={s.header}>
+          <Text style={s.headerTitle}>Carteira</Text>
+          <TouchableOpacity style={s.addPortfolioBtn} onPress={() => setShowCreate(true)}>
+            <Ionicons name="add" color={C.accentLt} size={18} />
+            <Text style={s.addPortfolioBtnText}>Novo</Text>
           </TouchableOpacity>
-        )}
-      />
+        </View>
 
-      {/* Detalhe do portfólio selecionado */}
-      {selectedPortfolioId ? (
-        loadingDetail ? (
-          <ActivityIndicator color="#818cf8" style={{ marginTop: 40 }} />
+        {/* Portfolio tabs */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll} contentContainerStyle={s.tabRow}>
+          {(portfolios ?? []).map((p: PortfolioListItem) => (
+            <TouchableOpacity
+              key={p.id}
+              style={[s.tab, selectedId === p.id && s.tabActive]}
+              onPress={() => setSelectedId(p.id)}
+              onLongPress={() => Alert.alert('Excluir', `Excluir "${p.name}"?`, [
+                { text: 'Cancelar', style: 'cancel' },
+                { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate(p.id) },
+              ])}
+            >
+              <Text style={[s.tabText, selectedId === p.id && s.tabTextActive]}>{p.name}</Text>
+              <Text style={s.tabCount}>{p.asset_count} ativos</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Asset grid */}
+        {!selectedId ? (
+          <View style={s.centered}>
+            <Text style={{ fontSize: 44, marginBottom: 12 }}>💼</Text>
+            <Text style={s.emptyText}>Selecione ou crie um portfólio.</Text>
+          </View>
+        ) : loadingDetail ? (
+          <ActivityIndicator color={C.accentLt} style={{ marginTop: 40 }} />
         ) : (
-          <View style={styles.assetSection}>
-            <View style={styles.assetHeader}>
-              <Text style={styles.assetTitle}>Ativos</Text>
-              <TouchableOpacity
-                style={styles.addAssetButton}
-                onPress={() => setShowAddAsset(true)}
-              >
-                <Text style={styles.addAssetButtonText}>+ Adicionar</Text>
+          <View style={{ flex: 1, paddingHorizontal: 20 }}>
+            <View style={s.assetHeader}>
+              <Text style={s.assetSectionTitle}>Ativos</Text>
+              <TouchableOpacity style={s.addAssetBtn} onPress={() => setShowAddAsset(true)}>
+                <Ionicons name="add" color={C.accentLt} size={16} />
+                <Text style={s.addAssetBtnText}>Adicionar</Text>
               </TouchableOpacity>
             </View>
 
-            {selectedPortfolio?.assets.length === 0 ? (
-              <View style={styles.emptyAssets}>
-                <Text style={styles.emptyAssetsEmoji}>📊</Text>
-                <Text style={styles.emptyAssetsText}>
-                  Nenhum ativo ainda.{'\n'}Adicione seu primeiro ativo!
-                </Text>
+            {!detail?.assets.length ? (
+              <View style={[s.centered, { flex: 1 }]}>
+                <Text style={{ fontSize: 44, marginBottom: 12 }}>📊</Text>
+                <Text style={s.emptyText}>Nenhum ativo ainda.{'\n'}Toque em Adicionar!</Text>
               </View>
             ) : (
               <FlatList
-                data={selectedPortfolio?.assets}
-                keyExtractor={(item) => String(item.id)}
-                contentContainerStyle={styles.assetList}
-                renderItem={({ item }) => (
-                  <View style={styles.assetCard}>
-                    <View style={styles.assetCardLeft}>
-                      <Text style={styles.assetTicker}>{item.ticker}</Text>
-                      <Text style={styles.assetName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                    </View>
-                    <View style={styles.assetCardRight}>
-                      <AssetTypeTag type={item.asset_type} />
+                data={detail.assets}
+                keyExtractor={(i) => String(i.id)}
+                numColumns={2}
+                columnWrapperStyle={s.gridRow}
+                contentContainerStyle={{ paddingBottom: 24 }}
+                renderItem={({ item }) => {
+                  const col = TYPE_COLORS[item.asset_type] ?? TYPE_COLORS.stock;
+                  const typeInfo = ASSET_TYPES.find((t) => t.value === item.asset_type);
+                  return (
+                    <View style={[s.assetCard, { borderColor: col.text + '44' }]}>
+                      <View style={[s.assetIconBg, { backgroundColor: col.bg }]}>
+                        <Text style={{ fontSize: 22 }}>{typeInfo?.icon ?? '📈'}</Text>
+                      </View>
+                      <Text style={[s.assetTicker, { color: col.text }]}>{item.ticker}</Text>
+                      <Text style={s.assetName} numberOfLines={1}>{item.name}</Text>
+                      <View style={[s.assetType, { backgroundColor: col.bg }]}>
+                        <Text style={[s.assetTypeText, { color: col.text }]}>{typeInfo?.label ?? item.asset_type}</Text>
+                      </View>
                       <TouchableOpacity
-                        style={styles.removeButton}
-                        onPress={() => confirmRemoveAsset(item.id, item.ticker)}
+                        style={s.removeBtn}
+                        onPress={() => Alert.alert('Remover', `Remover ${item.ticker}?`, [
+                          { text: 'Cancelar', style: 'cancel' },
+                          { text: 'Remover', style: 'destructive', onPress: () => removeMutation.mutate(item.id) },
+                        ])}
                       >
-                        <Text style={styles.removeButtonText}>✕</Text>
+                        <Ionicons name="close" color="#f87171" size={14} />
                       </TouchableOpacity>
                     </View>
-                  </View>
-                )}
+                  );
+                }}
               />
             )}
           </View>
-        )
-      ) : (
-        <View style={styles.noSelection}>
-          <Text style={styles.noSelectionEmoji}>💼</Text>
-          <Text style={styles.noSelectionText}>
-            Selecione ou crie um portfólio para ver seus ativos.
-          </Text>
-        </View>
-      )}
+        )}
 
-      {/* Modal: criar portfólio */}
-      <Modal visible={showCreatePortfolio} transparent animationType="slide" onRequestClose={() => setShowCreatePortfolio(false)}>
-        <TouchableWithoutFeedback onPress={() => setShowCreatePortfolio(false)}>
-          <View style={styles.modalOverlay}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-              <View style={styles.modalSheet} onStartShouldSetResponder={() => true}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Novo portfólio</Text>
-                  <TouchableOpacity onPress={() => setShowCreatePortfolio(false)} hitSlop={8}>
-                    <Text style={styles.modalClose}>✕</Text>
+        {/* Modal: criar portfólio */}
+        <Modal visible={showCreate} transparent animationType="slide" onRequestClose={() => setShowCreate(false)}>
+          <TouchableWithoutFeedback onPress={() => setShowCreate(false)}>
+            <View style={s.overlay}>
+              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+                <View style={s.sheet} onStartShouldSetResponder={() => true}>
+                  <Text style={s.sheetTitle}>Novo portfólio</Text>
+                  <TextInput
+                    style={s.input}
+                    placeholder="Nome do portfólio"
+                    placeholderTextColor={C.textMuted}
+                    value={newName}
+                    onChangeText={setNewName}
+                  />
+                  <TouchableOpacity
+                    style={[s.sheetBtn, !newName.trim() && { opacity: 0.4 }]}
+                    disabled={!newName.trim() || createMutation.isPending}
+                    onPress={() => createMutation.mutate(newName.trim())}
+                  >
+                    {createMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={s.sheetBtnText}>Criar</Text>}
                   </TouchableOpacity>
                 </View>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Nome do portfólio"
-                  placeholderTextColor="#64748b"
-                  value={newPortfolioName}
-                  onChangeText={setNewPortfolioName}
-                />
-                <TouchableOpacity
-                  style={[styles.modalButton, !newPortfolioName.trim() && styles.buttonDisabled]}
-                  disabled={!newPortfolioName.trim() || createPortfolioMutation.isPending}
-                  onPress={() => createPortfolioMutation.mutate(newPortfolioName.trim())}
-                >
-                  {createPortfolioMutation.isPending ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.modalButtonText}>Criar</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidingView>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+              </KeyboardAvoidingView>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
 
-      {/* Modal: adicionar ativo */}
-      <Modal visible={showAddAsset} transparent animationType="slide" onRequestClose={() => setShowAddAsset(false)}>
-        <TouchableWithoutFeedback onPress={() => setShowAddAsset(false)}>
-          <View style={styles.modalOverlay}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-              <View style={styles.modalSheet} onStartShouldSetResponder={() => true}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Adicionar ativo</Text>
-                  <TouchableOpacity onPress={() => setShowAddAsset(false)} hitSlop={8}>
-                    <Text style={styles.modalClose}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <Text style={styles.modalLabel}>Ticker</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Ex: PETR4, BTC, HGLG11"
-                  placeholderTextColor="#64748b"
-                  value={assetTicker}
-                  onChangeText={setAssetTicker}
-                  autoCapitalize="characters"
-                />
-
-                <Text style={styles.modalLabel}>Nome</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Ex: Petrobras PN"
-                  placeholderTextColor="#64748b"
-                  value={assetName}
-                  onChangeText={setAssetName}
-                />
-
-                <Text style={styles.modalLabel}>Tipo</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.typeSelector}
-                >
-                  {ASSET_TYPES.map((t) => (
-                    <TouchableOpacity
-                      key={t.value}
-                      style={[
-                        styles.typeOption,
-                        assetType === t.value && styles.typeOptionActive,
-                      ]}
-                      onPress={() => setAssetType(t.value)}
-                    >
-                      <Text
-                        style={[
-                          styles.typeOptionText,
-                          assetType === t.value && styles.typeOptionTextActive,
-                        ]}
+        {/* Modal: adicionar ativo */}
+        <Modal visible={showAddAsset} transparent animationType="slide" onRequestClose={() => setShowAddAsset(false)}>
+          <TouchableWithoutFeedback onPress={() => setShowAddAsset(false)}>
+            <View style={s.overlay}>
+              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+                <View style={s.sheet} onStartShouldSetResponder={() => true}>
+                  <Text style={s.sheetTitle}>Adicionar ativo</Text>
+                  <Text style={s.inputLabel}>Ticker</Text>
+                  <TextInput
+                    style={s.input}
+                    placeholder="Ex: PETR4, BTC"
+                    placeholderTextColor={C.textMuted}
+                    value={ticker}
+                    onChangeText={setTicker}
+                    autoCapitalize="characters"
+                  />
+                  <Text style={s.inputLabel}>Nome</Text>
+                  <TextInput
+                    style={s.input}
+                    placeholder="Ex: Petrobras PN"
+                    placeholderTextColor={C.textMuted}
+                    value={assetName}
+                    onChangeText={setAssetName}
+                  />
+                  <Text style={s.inputLabel}>Tipo</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+                    {ASSET_TYPES.map((t) => (
+                      <TouchableOpacity
+                        key={t.value}
+                        style={[s.typeOpt, assetType === t.value && s.typeOptActive]}
+                        onPress={() => setAssetType(t.value)}
                       >
-                        {t.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-
-                <TouchableOpacity
-                  style={[
-                    styles.modalButton,
-                    (!assetTicker.trim() || !assetName.trim()) && styles.buttonDisabled,
-                  ]}
-                  disabled={!assetTicker.trim() || !assetName.trim() || addAssetMutation.isPending}
-                  onPress={() => addAssetMutation.mutate()}
-                >
-                  {addAssetMutation.isPending ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.modalButtonText}>Adicionar</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidingView>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-    </SafeAreaView>
+                        <Text>{t.icon}</Text>
+                        <Text style={[s.typeOptText, assetType === t.value && s.typeOptTextActive]}>{t.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  <TouchableOpacity
+                    style={[s.sheetBtn, (!ticker.trim() || !assetName.trim()) && { opacity: 0.4 }]}
+                    disabled={!ticker.trim() || !assetName.trim() || addMutation.isPending}
+                    onPress={() => addMutation.mutate()}
+                  >
+                    {addMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={s.sheetBtnText}>Adicionar</Text>}
+                  </TouchableOpacity>
+                </View>
+              </KeyboardAvoidingView>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0f172a' },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
+  emptyText: { color: C.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 22 },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 12,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
   },
-  headerTitle: { fontSize: 24, fontWeight: '700', color: '#f1f5f9' },
-  addButton: {
-    backgroundColor: '#312e81',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  headerTitle: { color: C.text, fontSize: 24, fontWeight: '700' },
+  addPortfolioBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: C.bgCard, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7,
+    borderWidth: 1, borderColor: C.border,
   },
-  addButtonText: { color: '#818cf8', fontWeight: '600', fontSize: 14 },
-  portfolioList: { paddingHorizontal: 20, paddingBottom: 12, gap: 10, alignItems: 'center' },
-  portfolioChip: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#334155',
-    minWidth: 120,
-    alignSelf: 'flex-start',
+  addPortfolioBtnText: { color: C.accentLt, fontWeight: '600', fontSize: 14 },
+  tabScroll: { height: 72, marginBottom: 8 },
+  tabRow: { paddingHorizontal: 20, gap: 10, alignItems: 'center' },
+  tab: {
+    backgroundColor: C.bgCard, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10,
+    borderWidth: 1, borderColor: C.border, minWidth: 110,
   },
-  portfolioChipActive: {
-    borderColor: '#818cf8',
-    backgroundColor: '#1e1b4b',
-  },
-  portfolioChipText: { color: '#94a3b8', fontWeight: '600', fontSize: 14 },
-  portfolioChipTextActive: { color: '#818cf8' },
-  portfolioChipCount: { color: '#475569', fontSize: 11, marginTop: 2 },
-  emptyText: { color: '#475569', marginTop: 8, fontSize: 14 },
-  assetSection: { flex: 1, paddingHorizontal: 20 },
+  tabActive: { backgroundColor: '#1e0d4e', borderColor: C.accent },
+  tabText: { color: C.textMuted, fontWeight: '600', fontSize: 14 },
+  tabTextActive: { color: C.accentLt },
+  tabCount: { color: C.textMuted, fontSize: 11, marginTop: 2 },
+
   assetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 14,
   },
-  assetTitle: { color: '#f1f5f9', fontSize: 18, fontWeight: '600' },
-  addAssetButton: {
-    backgroundColor: '#1e293b',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: '#334155',
+  assetSectionTitle: { color: C.text, fontSize: 18, fontWeight: '600' },
+  addAssetBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: C.bgCard, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
+    borderWidth: 1, borderColor: C.border,
   },
-  addAssetButtonText: { color: '#818cf8', fontSize: 13, fontWeight: '600' },
-  assetList: { gap: 8, paddingBottom: 20 },
+  addAssetBtnText: { color: C.accentLt, fontSize: 13, fontWeight: '600' },
+
+  gridRow: { gap: 12, marginBottom: 12 },
   assetCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
+    flex: 1, backgroundColor: C.bgCard, borderRadius: 16, padding: 14,
+    borderWidth: 1, alignItems: 'flex-start', position: 'relative',
   },
-  assetCardLeft: { flex: 1 },
-  assetTicker: { color: '#f1f5f9', fontWeight: '700', fontSize: 16 },
-  assetName: { color: '#64748b', fontSize: 12, marginTop: 2 },
-  assetCardRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  removeButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#450a0a',
-    justifyContent: 'center',
-    alignItems: 'center',
+  assetIconBg: {
+    width: 44, height: 44, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 10,
   },
-  removeButtonText: { color: '#f87171', fontSize: 12, fontWeight: '700' },
-  emptyAssets: { alignItems: 'center', marginTop: 60 },
-  emptyAssetsEmoji: { fontSize: 48, marginBottom: 12 },
-  emptyAssetsText: { color: '#475569', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  noSelection: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
-  noSelectionEmoji: { fontSize: 48, marginBottom: 12 },
-  noSelectionText: { color: '#475569', fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
+  assetTicker: { fontSize: 20, fontWeight: '800', marginBottom: 2 },
+  assetName: { color: C.textMuted, fontSize: 11, marginBottom: 8 },
+  assetType: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  assetTypeText: { fontSize: 10, fontWeight: '700' },
+  removeBtn: {
+    position: 'absolute', top: 8, right: 8,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: '#2d0707', justifyContent: 'center', alignItems: 'center',
   },
-  modalSheet: {
-    backgroundColor: '#1e293b',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    paddingBottom: 40,
+
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: C.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 40, borderTopWidth: 1, borderColor: C.border,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+  sheetTitle: { color: C.text, fontSize: 20, fontWeight: '700', marginBottom: 20 },
+  inputLabel: { color: C.textSec, fontSize: 12, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
+  input: {
+    backgroundColor: C.bgInput, borderWidth: 1, borderColor: C.border,
+    borderRadius: 10, padding: 14, color: C.text, fontSize: 15, marginBottom: 16,
   },
-  modalTitle: { color: '#f1f5f9', fontSize: 20, fontWeight: '700' },
-  modalClose: { color: '#64748b', fontSize: 18, fontWeight: '600' },
-  modalLabel: {
-    color: '#94a3b8',
-    fontSize: 12,
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: 6,
+  typeOpt: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8,
+    backgroundColor: C.bgInput, borderWidth: 1, borderColor: C.border, marginRight: 8,
   },
-  modalInput: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 10,
-    padding: 14,
-    color: '#f1f5f9',
-    fontSize: 15,
-    marginBottom: 16,
+  typeOptActive: { borderColor: C.accent, backgroundColor: '#1e0d4e' },
+  typeOptText: { color: C.textMuted, fontWeight: '600', fontSize: 13 },
+  typeOptTextActive: { color: C.accentLt },
+  sheetBtn: {
+    backgroundColor: C.accent, borderRadius: 12, padding: 16, alignItems: 'center',
   },
-  typeSelector: { marginBottom: 20 },
-  typeOption: {
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginRight: 8,
-  },
-  typeOptionActive: { borderColor: '#818cf8', backgroundColor: '#1e1b4b' },
-  typeOptionText: { color: '#64748b', fontWeight: '600', fontSize: 13 },
-  typeOptionTextActive: { color: '#818cf8' },
-  modalButton: {
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  buttonDisabled: { opacity: 0.5 },
-  modalButtonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  sheetBtnText: { color: '#fff', fontWeight: '600', fontSize: 16 },
 });

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from .base import BaseNewsFetcher
 from .yfinance_fetcher import YFinanceFetcher
+from .google_news_fetcher import GoogleNewsFetcher
 
 # Map slug → fetcher class.
 # To add a new hub, import its class and add it here.
 FETCHER_REGISTRY: dict[str, type[BaseNewsFetcher]] = {
     YFinanceFetcher.source_slug: YFinanceFetcher,
+    GoogleNewsFetcher.source_slug: GoogleNewsFetcher,
     # 'finnhub': FinnhubFetcher,
     # 'newsapi': NewsApiFetcher,
 }
