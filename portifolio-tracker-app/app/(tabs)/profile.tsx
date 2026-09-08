@@ -1,17 +1,19 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { C } from '../../src/theme';
+import { C, R, TAB_BAR_SPACE, shadow } from '../../src/theme';
 import { DecoBackground } from '../../src/components/ui/DecoBackground';
+import { DangerButton, GlassCard, IconBubble, type IconName } from '../../src/components/ui/primitives';
 import { useAuthStore } from '../../src/store/authStore';
 
-const MENU_ITEMS = [
-  { id: 'settings',   icon: 'person-circle-outline', label: 'Configurações de Perfil' },
-  { id: 'notifs',     icon: 'notifications-outline',  label: 'Notificações' },
-  { id: 'privacy',    icon: 'shield-checkmark-outline',label: 'Política de Privacidade' },
-  { id: 'help',       icon: 'help-circle-outline',    label: 'Ajuda & Suporte' },
-] as const;
+const MENU_ITEMS: { id: string; icon: IconName; label: string }[] = [
+  { id: 'settings',   icon: 'person-outline',           label: 'Configurações de Perfil' },
+  { id: 'notifs',     icon: 'notifications-outline',    label: 'Notificações' },
+  { id: 'privacy',    icon: 'shield-checkmark-outline', label: 'Política de Privacidade' },
+  { id: 'help',       icon: 'headset-outline',          label: 'Ajuda & Suporte' },
+];
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
@@ -29,44 +31,42 @@ export default function ProfileScreen() {
   return (
     <View style={s.root}>
       <DecoBackground />
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={s.inner}>
-          {/* Avatar */}
-          <View style={s.avatarWrap}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+        <ScrollView contentContainerStyle={s.inner} showsVerticalScrollIndicator={false}>
+          {/* Avatar com anel gradiente (Figma) */}
+          <LinearGradient colors={[C.accentLt, C.pink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.avatarRing}>
             <View style={s.avatar}>
               <Text style={s.avatarText}>{initial}</Text>
             </View>
-            <View style={s.avatarBadge}>
-              <Ionicons name="checkmark" color="#fff" size={10} />
-            </View>
-          </View>
+          </LinearGradient>
 
           <Text style={s.name}>{username}</Text>
           <Text style={s.email}>{user?.email}</Text>
 
-          {/* Menu */}
+          {/* Menu (linhas translúcidas com ícone e chevron) */}
           <View style={s.menu}>
-            {MENU_ITEMS.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={s.menuItem}
-                onPress={item.id === 'settings' ? () => router.push('/profile-settings') : undefined}
-              >
-                <View style={s.menuIconWrap}>
-                  <Ionicons name={item.icon as any} color={C.accentLt} size={18} />
-                </View>
-                <Text style={s.menuLabel}>{item.label}</Text>
-                <Ionicons name="chevron-forward" color={C.textMuted} size={16} />
-              </TouchableOpacity>
-            ))}
+            {MENU_ITEMS.map((item) => {
+              const enabled = item.id === 'settings';
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  activeOpacity={0.8}
+                  disabled={!enabled}
+                  onPress={enabled ? () => router.push('/profile-settings') : undefined}
+                  accessibilityRole="button"
+                >
+                  <GlassCard style={[s.menuItem, !enabled && s.menuItemDisabled]}>
+                    <IconBubble name={item.icon} size={38} color={C.textSec} />
+                    <Text style={s.menuLabel}>{item.label}</Text>
+                    <Ionicons name="chevron-forward" color={C.textMuted} size={18} />
+                  </GlassCard>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
-          {/* Logout */}
-          <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" color="#f87171" size={18} />
-            <Text style={s.logoutText}>Sair da conta</Text>
-          </TouchableOpacity>
-        </View>
+          <DangerButton label="Sair da conta" onPress={handleLogout} style={s.logout} />
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
@@ -74,42 +74,22 @@ export default function ProfileScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  inner: { flex: 1, alignItems: 'center', paddingTop: 40, paddingHorizontal: 24 },
-
-  avatarWrap: { position: 'relative', marginBottom: 16 },
-  avatar: {
-    width: 88, height: 88, borderRadius: 44,
-    backgroundColor: C.accentDk, borderWidth: 3, borderColor: C.accent,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  avatarText: { color: C.accentLt, fontSize: 36, fontWeight: '700' },
-  avatarBadge: {
-    position: 'absolute', bottom: 2, right: 2,
-    width: 22, height: 22, borderRadius: 11,
-    backgroundColor: '#059669', borderWidth: 2, borderColor: C.bg,
-    justifyContent: 'center', alignItems: 'center',
+  inner: {
+    alignItems: 'center', paddingTop: 36, paddingHorizontal: 20, paddingBottom: TAB_BAR_SPACE,
+    width: '100%', maxWidth: 520, alignSelf: 'center',
   },
 
-  name: { color: C.text, fontSize: 22, fontWeight: '700', marginBottom: 4 },
-  email: { color: C.textMuted, fontSize: 14, marginBottom: 36 },
+  avatarRing: { width: 104, height: 104, borderRadius: 52, alignItems: 'center', justifyContent: 'center', marginBottom: 16, ...shadow.glow },
+  avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: C.bgSolid, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: C.text, fontSize: 38, fontWeight: '700' },
 
-  menu: { width: '100%', gap: 6 },
-  menuItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: C.bgCard, borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: C.border,
-  },
-  menuIconWrap: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: C.accentDk, justifyContent: 'center', alignItems: 'center',
-  },
-  menuLabel: { color: C.text, fontSize: 15, flex: 1 },
+  name: { color: C.text, fontSize: 26, fontWeight: '700', letterSpacing: -0.3, marginBottom: 2, textAlign: 'center' },
+  email: { color: C.textMuted, fontSize: 14, marginBottom: 28, textAlign: 'center' },
 
-  logoutBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    marginTop: 32, backgroundColor: '#2d0707', borderRadius: 14,
-    paddingVertical: 14, paddingHorizontal: 32,
-    borderWidth: 1, borderColor: '#7f1d1d',
-  },
-  logoutText: { color: '#f87171', fontWeight: '600', fontSize: 15 },
+  menu: { width: '100%', gap: 10 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: R.lg },
+  menuItemDisabled: { opacity: 0.55 },
+  menuLabel: { color: C.text, fontSize: 15, fontWeight: '500', flex: 1 },
+
+  logout: { alignSelf: 'center', minWidth: 200, marginTop: 28 },
 });

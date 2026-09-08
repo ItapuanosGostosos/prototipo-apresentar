@@ -8,15 +8,17 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
-  TextInput,
   Image,
   Linking,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { C } from '../../src/theme';
+import { C, R, TAB_BAR_SPACE, shadow } from '../../src/theme';
 import { DecoBackground } from '../../src/components/ui/DecoBackground';
+import { Chip, EmptyState, GhostButton, GlassCard, Input, ScreenHeader } from '../../src/components/ui/primitives';
 import { getGlobalNews, getPortfolioNews } from '../../src/services/news';
 import { listPortfolios } from '../../src/services/portfolios';
 import { analysePortfolio } from '../../src/services/analyses';
@@ -28,35 +30,54 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 }
 
+function TickerPills({ tickers, max = 3 }: { tickers: string[]; max?: number }) {
+  if (tickers.length === 0) return null;
+  const shown = tickers.slice(0, max);
+  const rest = tickers.length - shown.length;
+  return (
+    <View style={s.tickerRow}>
+      {shown.map((t) => (
+        <View key={t} style={s.tickerBadge}><Text style={s.tickerText}>{t}</Text></View>
+      ))}
+      {rest > 0 ? <View style={s.tickerBadge}><Text style={s.tickerText}>+{rest}</Text></View> : null}
+    </View>
+  );
+}
+
+/** Destaque (Figma "News Screen"): imagem grande com gradiente e botão "Analise com IA". */
 function FeaturedCard({ article, onAnalyse, pending }: { article: NewsArticle; onAnalyse: () => void; pending: boolean }) {
   return (
-    <TouchableOpacity style={s.featured} onPress={() => Linking.openURL(article.url)} activeOpacity={0.85}>
+    <TouchableOpacity style={s.featured} onPress={() => Linking.openURL(article.url)} activeOpacity={0.85} accessibilityRole="link">
       {article.thumbnail_url ? (
-        <Image source={{ uri: article.thumbnail_url }} style={s.featuredImg} resizeMode="cover" />
+        <Image source={{ uri: article.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
-        <View style={[s.featuredImg, { backgroundColor: C.bgCardLt }]} />
+        <LinearGradient colors={[C.accentDk, C.bgMid]} style={StyleSheet.absoluteFill} />
       )}
-      <View style={s.featuredOverlay}>
-        {article.tickers.length > 0 && (
-          <View style={s.tickerRow}>
-            {article.tickers.slice(0, 3).map((t) => (
-              <View key={t} style={s.tickerBadge}>
-                <Text style={s.tickerText}>{t}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+      <LinearGradient
+        colors={['rgba(10,7,20,0)', 'rgba(10,7,20,0.55)', 'rgba(10,7,20,0.96)']}
+        locations={[0.15, 0.55, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={s.featuredBody}>
+        <View style={s.meta}>
+          {article.source && <Text style={s.metaSource}>{article.source.name}</Text>}
+          <Text style={s.metaDate}>{formatDate(article.published_at)}</Text>
+        </View>
         <Text style={s.featuredTitle} numberOfLines={3}>{article.title}</Text>
         <View style={s.featuredFooter}>
-          {article.source && <Text style={s.featuredSource}>{article.source.name}</Text>}
+          <TickerPills tickers={article.tickers} />
           <TouchableOpacity
             style={[s.analyseBtn, pending && { opacity: 0.5 }]}
             onPress={(e) => { e.stopPropagation?.(); onAnalyse(); }}
             disabled={pending}
+            accessibilityRole="button"
           >
             {pending
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={s.analyseBtnText}>Analisar com IA</Text>
+              ? <ActivityIndicator size="small" color={C.textOnLight} />
+              : <>
+                  <Ionicons name="sparkles" size={14} color={C.textOnLight} />
+                  <Text style={s.analyseBtnText}>Analise com IA</Text>
+                </>
             }
           </TouchableOpacity>
         </View>
@@ -67,26 +88,35 @@ function FeaturedCard({ article, onAnalyse, pending }: { article: NewsArticle; o
 
 function ArticleCard({ article, onAnalyse, pending }: { article: NewsArticle; onAnalyse: () => void; pending: boolean }) {
   return (
-    <TouchableOpacity style={s.card} onPress={() => Linking.openURL(article.url)} activeOpacity={0.8}>
-      {article.thumbnail_url ? (
-        <Image source={{ uri: article.thumbnail_url }} style={s.cardThumb} resizeMode="cover" />
-      ) : (
-        <View style={[s.cardThumb, { backgroundColor: C.bgCardLt }]} />
-      )}
-      <View style={s.cardBody}>
-        {article.source && <Text style={s.cardSource}>{article.source.name}</Text>}
-        <Text style={s.cardTitle} numberOfLines={3}>{article.title}</Text>
-        <View style={s.cardFooter}>
-          <Text style={s.cardDate}>{formatDate(article.published_at)}</Text>
-          <TouchableOpacity
-            style={[s.cardAnalyseBtn, pending && { opacity: 0.5 }]}
-            onPress={(e) => { e.stopPropagation?.(); onAnalyse(); }}
-            disabled={pending}
-          >
-            <Text style={s.cardAnalyseBtnText}>IA</Text>
-          </TouchableOpacity>
+    <TouchableOpacity onPress={() => Linking.openURL(article.url)} activeOpacity={0.8} accessibilityRole="link">
+      <GlassCard style={s.card}>
+        <View style={s.cardBody}>
+          <View style={s.meta}>
+            {article.source && <Text style={s.metaSource}>{article.source.name}</Text>}
+            <Text style={s.metaDate}>{formatDate(article.published_at)}</Text>
+          </View>
+          <Text style={s.cardTitle} numberOfLines={3}>{article.title}</Text>
+          <View style={s.cardFooter}>
+            <TickerPills tickers={article.tickers} max={2} />
+            <TouchableOpacity
+              style={[s.cardAnalyseBtn, pending && { opacity: 0.5 }]}
+              onPress={(e) => { e.stopPropagation?.(); onAnalyse(); }}
+              disabled={pending}
+              accessibilityLabel="Analisar com IA"
+            >
+              <Ionicons name="sparkles" size={12} color={C.accentLt} />
+              <Text style={s.cardAnalyseBtnText}>IA</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+        {article.thumbnail_url ? (
+          <Image source={{ uri: article.thumbnail_url }} style={s.cardThumb} resizeMode="cover" />
+        ) : (
+          <View style={[s.cardThumb, s.cardThumbPlaceholder]}>
+            <Ionicons name="newspaper-outline" size={24} color={C.textMuted} />
+          </View>
+        )}
+      </GlassCard>
     </TouchableOpacity>
   );
 }
@@ -146,54 +176,41 @@ export default function NewsScreen() {
   return (
     <View style={s.root}>
       <DecoBackground />
-      <SafeAreaView style={{ flex: 1 }}>
-        {/* Header */}
-        <View style={s.header}>
-          <Text style={s.headerTitle}>Notícias</Text>
-          <TouchableOpacity
-            style={[s.analyseHeaderBtn, analyseMutation.isPending && { opacity: 0.5 }]}
-            onPress={handleAnalyse}
-            disabled={analyseMutation.isPending}
-          >
-            {analyseMutation.isPending
-              ? <ActivityIndicator size="small" color={C.accentLt} />
-              : <Text style={s.analyseHeaderBtnText}>Analisar</Text>
-            }
-          </TouchableOpacity>
-        </View>
+      <SafeAreaView style={s.page} edges={['top', 'left', 'right']}>
+        <ScreenHeader
+          title="Notícias"
+          subtitle={articles.length > 0 ? `${articles.length} artigos` : undefined}
+          right={
+            <GhostButton
+              label="Analisar"
+              icon="sparkles-outline"
+              onPress={handleAnalyse}
+              loading={analyseMutation.isPending}
+            />
+          }
+        />
 
-        {/* Filters */}
+        {/* Filtros */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterScroll} contentContainerStyle={s.filterRow}>
-          {(['all', 'ticker'] as const).map((mode) => (
-            <TouchableOpacity
-              key={mode}
-              style={[s.chip, filterMode === mode && s.chipActive]}
-              onPress={() => setFilterMode(mode)}
-            >
-              <Text style={[s.chipText, filterMode === mode && s.chipTextActive]}>
-                {mode === 'all' ? 'Todos' : 'Por ticker'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <Chip label="Todos" active={filterMode === 'all'} onPress={() => setFilterMode('all')} />
+          <Chip label="Por ticker" icon="search-outline" active={filterMode === 'ticker'} onPress={() => setFilterMode('ticker')} />
           {(portfolios ?? []).map((p: PortfolioListItem) => (
-            <TouchableOpacity
+            <Chip
               key={p.id}
-              style={[s.chip, filterMode === 'portfolio' && selectedPortfolioId === p.id && s.chipActive]}
+              label={p.name}
+              icon="wallet-outline"
+              active={filterMode === 'portfolio' && selectedPortfolioId === p.id}
               onPress={() => { setFilterMode('portfolio'); setSelectedPortfolioId(p.id); }}
-            >
-              <Text style={[s.chipText, filterMode === 'portfolio' && selectedPortfolioId === p.id && s.chipTextActive]}>
-                {p.name}
-              </Text>
-            </TouchableOpacity>
+            />
           ))}
         </ScrollView>
 
         {filterMode === 'ticker' && (
           <View style={s.searchWrap}>
-            <TextInput
+            <Ionicons name="search-outline" size={18} color={C.textMuted} style={s.searchIcon} />
+            <Input
               style={s.searchInput}
-              placeholder="Ex: PETR4, BTC..."
-              placeholderTextColor={C.textMuted}
+              placeholder="Buscar por ticker (ex: PETR4, BTC)"
               value={tickerSearch}
               onChangeText={setTickerSearch}
               autoCapitalize="characters"
@@ -206,10 +223,17 @@ export default function NewsScreen() {
             <ActivityIndicator color={C.accentLt} size="large" />
             <Text style={s.loadingText}>Buscando notícias...</Text>
           </View>
+        ) : filterMode === 'portfolio' && !selectedPortfolioId ? (
+          <View style={s.centered}>
+            <EmptyState icon="wallet-outline" title="Escolha um portfólio" description="Selecione um portfólio acima para ver as notícias." />
+          </View>
         ) : articles.length === 0 ? (
           <View style={s.centered}>
-            <Text style={s.emptyEmoji}>📭</Text>
-            <Text style={s.emptyText}>Nenhuma notícia encontrada.</Text>
+            <EmptyState
+              icon="newspaper-outline"
+              title="Nenhuma notícia encontrada"
+              description={filterMode === 'ticker' && tickerSearch ? `Nada para "${tickerSearch}".` : 'Volte mais tarde para ver atualizações.'}
+            />
           </View>
         ) : (
           <FlatList
@@ -242,76 +266,52 @@ export default function NewsScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
-  },
-  headerTitle: { color: C.text, fontSize: 24, fontWeight: '700' },
-  analyseHeaderBtn: {
-    backgroundColor: C.bgCard, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7,
-    borderWidth: 1, borderColor: C.border, minWidth: 80, alignItems: 'center',
-  },
-  analyseHeaderBtnText: { color: C.accentLt, fontSize: 13, fontWeight: '600' },
-  filterScroll: { height: 44, marginBottom: 6 },
-  filterRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center' },
-  chip: {
-    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
-    backgroundColor: C.bgCard, borderWidth: 1, borderColor: C.border,
-  },
-  chipActive: { backgroundColor: '#2e1065', borderColor: C.accent },
-  chipText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
-  chipTextActive: { color: C.accentLt, fontWeight: '600' },
-  searchWrap: { paddingHorizontal: 20, marginBottom: 8 },
-  searchInput: {
-    backgroundColor: C.bgCard, borderWidth: 1, borderColor: C.border,
-    borderRadius: 10, padding: 12, color: C.text, fontSize: 14,
-  },
-  list: { paddingHorizontal: 20, paddingBottom: 24 },
+  // Largura máxima do conteúdo em telas largas (web/tablet)
+  page: { flex: 1, width: '100%', maxWidth: 720, alignSelf: 'center' },
 
-  // Featured
-  featured: {
-    borderRadius: 20, overflow: 'hidden', marginBottom: 16,
+  filterScroll: { flexGrow: 0, marginBottom: 8 },
+  filterRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center', paddingVertical: 4 },
+  searchWrap: { paddingHorizontal: 20, marginBottom: 8, position: 'relative' },
+  searchIcon: { position: 'absolute', left: 34, top: 15, zIndex: 1 },
+  searchInput: { paddingLeft: 42, height: 48 },
+  list: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: TAB_BAR_SPACE },
+
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  metaSource: { color: C.accentLt, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6 },
+  metaDate: { color: C.textMuted, fontSize: 11 },
+  tickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, flexShrink: 1 },
+  tickerBadge: {
+    backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: R.pill, paddingHorizontal: 10, paddingVertical: 3,
     borderWidth: 1, borderColor: C.border,
   },
-  featuredImg: { width: '100%', height: 220, backgroundColor: C.bgCard },
-  featuredOverlay: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(12,9,33,0.82)', padding: 14,
-  },
-  tickerRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
-  tickerBadge: {
-    backgroundColor: 'rgba(124,58,237,0.45)', borderRadius: 6,
-    paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: C.accent,
-  },
-  tickerText: { color: C.accentLt, fontSize: 11, fontWeight: '700' },
-  featuredTitle: { color: C.text, fontSize: 15, fontWeight: '700', lineHeight: 22, marginBottom: 10 },
-  featuredFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  featuredSource: { color: C.textMuted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 },
-  analyseBtn: {
-    backgroundColor: C.accent, borderRadius: 8, paddingHorizontal: 12,
-    paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 5,
-  },
-  analyseBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  tickerText: { color: C.text, fontSize: 11, fontWeight: '600' },
 
-  // Article card
-  card: {
-    flexDirection: 'row', backgroundColor: C.bgCard, borderRadius: 14,
-    overflow: 'hidden', borderWidth: 1, borderColor: C.border, marginBottom: 10,
+  // Destaque
+  featured: {
+    height: 300, borderRadius: R.xl, overflow: 'hidden', marginBottom: 16, backgroundColor: C.bgMid, ...shadow.soft,
   },
-  cardThumb: { width: 90, height: 90 },
-  cardBody: { flex: 1, padding: 10, justifyContent: 'space-between' },
-  cardSource: { color: C.accent, fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 },
-  cardTitle: { color: C.text, fontSize: 13, fontWeight: '600', lineHeight: 18, flex: 1 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
-  cardDate: { color: C.textMuted, fontSize: 11 },
+  featuredBody: { flex: 1, justifyContent: 'flex-end', padding: 20, gap: 8 },
+  featuredTitle: { color: C.text, fontSize: 21, fontWeight: '700', lineHeight: 28, letterSpacing: -0.3 },
+  featuredFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 },
+  analyseBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFFFF',
+    borderRadius: R.pill, paddingHorizontal: 14, height: 34,
+  },
+  analyseBtnText: { color: C.textOnLight, fontSize: 12, fontWeight: '700' },
+
+  // Linha de notícia
+  card: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, marginBottom: 10 },
+  cardBody: { flex: 1, gap: 6 },
+  cardTitle: { color: C.text, fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   cardAnalyseBtn: {
-    backgroundColor: C.accentDk, borderRadius: 6, paddingHorizontal: 8,
-    paddingVertical: 3, borderWidth: 1, borderColor: C.accent,
+    flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.accentSoft, borderRadius: R.pill,
+    paddingHorizontal: 10, height: 26, borderWidth: 1, borderColor: 'rgba(139,124,255,0.5)',
   },
   cardAnalyseBtnText: { color: C.accentLt, fontSize: 10, fontWeight: '800' },
+  cardThumb: { width: 88, height: 88, borderRadius: R.md, backgroundColor: C.bgCardLt },
+  cardThumbPlaceholder: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border },
 
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40, paddingBottom: TAB_BAR_SPACE / 2 },
   loadingText: { color: C.textMuted, fontSize: 14, marginTop: 12 },
-  emptyEmoji: { fontSize: 48, marginBottom: 12 },
-  emptyText: { color: C.textMuted, fontSize: 14, textAlign: 'center' },
 });
