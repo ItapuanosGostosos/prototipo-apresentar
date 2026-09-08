@@ -6,30 +6,31 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { C } from '../../src/theme';
+import { C, R, TAB_BAR_SPACE } from '../../src/theme';
 import { DecoBackground } from '../../src/components/ui/DecoBackground';
+import { Chip, EmptyState, GhostButton, GlassCard, ScreenHeader } from '../../src/components/ui/primitives';
 import { listPortfolios } from '../../src/services/portfolios';
 import { listAnalyses, analysePortfolio } from '../../src/services/analyses';
 import type { Analysis, PortfolioListItem, SentimentLabel } from '../../src/types';
 
 const SENT: Record<SentimentLabel, { label: string; color: string; bg: string }> = {
-  positive: { label: 'Positivo', color: '#4ade80', bg: '#052e16' },
-  negative: { label: 'Negativo', color: '#f87171', bg: '#2d0707' },
-  neutral:  { label: 'Neutro',   color: '#fbbf24', bg: '#1c1407' },
+  positive: { label: 'Positivo', color: C.success, bg: C.successSoft },
+  negative: { label: 'Negativo', color: '#FF8A8A', bg: C.dangerSoft },
+  neutral:  { label: 'Neutro',   color: C.warning, bg: C.warningSoft },
 };
 
 const STATUS: Record<string, { label: string; color: string }> = {
-  completed:  { label: 'Concluído',   color: '#4ade80' },
-  pending:    { label: 'Pendente',     color: '#fbbf24' },
-  processing: { label: 'Processando', color: '#60a5fa' },
-  failed:     { label: 'Falhou',      color: '#f87171' },
+  completed:  { label: 'Concluído',   color: C.success },
+  pending:    { label: 'Pendente',    color: C.warning },
+  processing: { label: 'Processando', color: C.info },
+  failed:     { label: 'Falhou',      color: '#FF8A8A' },
 };
 
 const TIME_FILTERS = ['1S', '1M', '3M', '6M', '1A'];
 
 function ScoreBar({ score }: { score: number }) {
   const pct = Math.min(Math.max(score, 0), 1);
-  const color = pct >= 0.6 ? '#4ade80' : pct >= 0.35 ? '#fbbf24' : '#f87171';
+  const color = pct >= 0.6 ? C.success : pct >= 0.35 ? C.warning : '#FF8A8A';
   return (
     <View style={b.wrap}>
       <View style={[b.fill, { width: `${Math.round(pct * 100)}%` as any, backgroundColor: color }]} />
@@ -37,8 +38,8 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 const b = StyleSheet.create({
-  wrap: { flex: 1, height: 4, backgroundColor: C.border, borderRadius: 2, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 2 },
+  wrap: { flex: 1, height: 5, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 3 },
 });
 
 function AnalysisCard({ item }: { item: Analysis }) {
@@ -47,18 +48,18 @@ function AnalysisCard({ item }: { item: Analysis }) {
   const st   = STATUS[item.status] ?? { label: item.status, color: C.textMuted };
 
   return (
-    <View style={s.card}>
+    <GlassCard style={s.card}>
       <View style={s.cardTop}>
         <View style={s.tickerBadge}><Text style={s.tickerText}>{item.ticker}</Text></View>
         <Text style={[s.statusText, { color: st.color }]}>{st.label}</Text>
         {sc && (
-          <View style={[s.sentBadge, { backgroundColor: sc.bg }]}>
+          <View style={[s.sentBadge, { backgroundColor: sc.bg, borderColor: sc.color + '55' }]}>
             <Text style={[s.sentText, { color: sc.color }]}>{sc.label}</Text>
           </View>
         )}
       </View>
 
-      <TouchableOpacity onPress={() => item.article_url && Linking.openURL(item.article_url)}>
+      <TouchableOpacity onPress={() => item.article_url && Linking.openURL(item.article_url)} accessibilityRole="link">
         <Text style={s.articleTitle} numberOfLines={2}>{item.article_title}</Text>
       </TouchableOpacity>
 
@@ -95,7 +96,7 @@ function AnalysisCard({ item }: { item: Analysis }) {
           ? new Date(item.finished_at).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
           : new Date(item.created_at).toLocaleDateString('pt-BR', { day:'2-digit', month:'short' })}
       </Text>
-    </View>
+    </GlassCard>
   );
 }
 
@@ -124,72 +125,54 @@ export default function AnalysesScreen() {
   const completed = (analyses ?? []).filter((a) => a.status === 'completed').length;
   const total = (analyses ?? []).length;
 
-  if (loadingP) return <View style={[s.root, s.centered]}><ActivityIndicator color={C.accentLt} size="large" /></View>;
+  if (loadingP) {
+    return (
+      <View style={[s.root, s.centered]}>
+        <DecoBackground />
+        <ActivityIndicator color={C.accentLt} size="large" />
+      </View>
+    );
+  }
 
   return (
     <View style={s.root}>
       <DecoBackground />
-      <SafeAreaView style={{ flex: 1 }}>
-        {/* Header */}
-        <View style={s.header}>
-          <View>
-            <Text style={s.headerTitle}>Analytics</Text>
-            {selectedId && total > 0 && (
-              <Text style={s.headerSub}>{completed} de {total} concluídas</Text>
-            )}
-          </View>
-          {selectedId && (
-            <TouchableOpacity
-              style={[s.triggerBtn, analyseMutation.isPending && { opacity: 0.5 }]}
-              onPress={() => analyseMutation.mutate()}
-              disabled={analyseMutation.isPending}
-            >
-              {analyseMutation.isPending
-                ? <ActivityIndicator size="small" color={C.accentLt} />
-                : <>
-                    <Ionicons name="pulse" color={C.accentLt} size={14} />
-                    <Text style={s.triggerBtnText}>Analisar</Text>
-                  </>
-              }
-            </TouchableOpacity>
-          )}
-        </View>
+      <SafeAreaView style={s.page} edges={['top', 'left', 'right']}>
+        <ScreenHeader
+          title="Analytics"
+          subtitle={selectedId && total > 0 ? `${completed} de ${total} concluídas` : undefined}
+          right={
+            selectedId ? (
+              <GhostButton label="Analisar" icon="pulse" onPress={() => analyseMutation.mutate()} loading={analyseMutation.isPending} />
+            ) : undefined
+          }
+        />
 
-        {/* Time filters */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.timeScroll} contentContainerStyle={s.timeRow}>
+        {/* Período (Figma: 1S · 1M · 3M · 6M · 1A) */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll} contentContainerStyle={s.chipRow}>
           {TIME_FILTERS.map((f) => (
-            <TouchableOpacity key={f} style={[s.timeChip, timeFilter === f && s.timeChipActive]} onPress={() => setTimeFilter(f)}>
-              <Text style={[s.timeChipText, timeFilter === f && s.timeChipTextActive]}>{f}</Text>
-            </TouchableOpacity>
+            <Chip key={f} label={f} active={timeFilter === f} onPress={() => setTimeFilter(f)} style={s.timeChip} />
           ))}
         </ScrollView>
 
-        {/* Portfolio selector */}
+        {/* Portfólio */}
         {(portfolios ?? []).length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll} contentContainerStyle={s.chipRow}>
             {(portfolios ?? []).map((p: PortfolioListItem) => (
-              <TouchableOpacity
-                key={p.id}
-                style={[s.chip, selectedId === p.id && s.chipActive]}
-                onPress={() => setSelectedId(p.id)}
-              >
-                <Text style={[s.chipText, selectedId === p.id && s.chipTextActive]}>{p.name}</Text>
-              </TouchableOpacity>
+              <Chip key={p.id} label={p.name} icon="wallet-outline" active={selectedId === p.id} onPress={() => setSelectedId(p.id)} />
             ))}
           </ScrollView>
         )}
 
         {!selectedId ? (
           <View style={s.centered}>
-            <Text style={{ fontSize: 48, marginBottom: 12 }}>🤖</Text>
-            <Text style={s.emptyText}>Selecione um portfólio para ver as análises de sentimento.</Text>
+            <EmptyState icon="pie-chart-outline" title="Escolha um portfólio" description="Selecione um portfólio para ver as análises de sentimento." />
           </View>
         ) : isLoading ? (
           <View style={s.centered}><ActivityIndicator color={C.accentLt} size="large" /></View>
         ) : !analyses?.length ? (
           <View style={s.centered}>
-            <Text style={{ fontSize: 48, marginBottom: 12 }}>📊</Text>
-            <Text style={s.emptyText}>Nenhuma análise ainda.{'\n'}Toque em "Analisar" para iniciar.</Text>
+            <EmptyState icon="stats-chart-outline" title="Nenhuma análise ainda" description='Toque em "Analisar" para iniciar.' />
           </View>
         ) : (
           <FlatList
@@ -208,67 +191,36 @@ export default function AnalysesScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
-  emptyText: { color: C.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 22 },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8,
-  },
-  headerTitle: { color: C.text, fontSize: 24, fontWeight: '700' },
-  headerSub: { color: C.textMuted, fontSize: 12, marginTop: 2 },
-  triggerBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: C.bgCard, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8,
-    borderWidth: 1, borderColor: C.border,
-  },
-  triggerBtnText: { color: C.accentLt, fontWeight: '600', fontSize: 14 },
+  page: { flex: 1, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40, paddingBottom: TAB_BAR_SPACE / 2 },
 
-  timeScroll: { height: 40, marginBottom: 4 },
-  timeRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center' },
-  timeChip: {
-    borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6,
-    backgroundColor: C.bgCard, borderWidth: 1, borderColor: C.border,
-  },
-  timeChipActive: { backgroundColor: '#1e0d4e', borderColor: C.accent },
-  timeChipText: { color: C.textMuted, fontSize: 13, fontWeight: '600' },
-  timeChipTextActive: { color: C.accentLt },
+  chipScroll: { flexGrow: 0, marginBottom: 6 },
+  chipRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center', paddingVertical: 4 },
+  timeChip: { paddingHorizontal: 18 },
 
-  chipScroll: { height: 44, marginBottom: 8 },
-  chipRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center' },
-  chip: {
-    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
-    backgroundColor: C.bgCard, borderWidth: 1, borderColor: C.border,
-  },
-  chipActive: { backgroundColor: '#1e0d4e', borderColor: C.accent },
-  chipText: { color: C.textMuted, fontSize: 13, fontWeight: '500' },
-  chipTextActive: { color: C.accentLt, fontWeight: '600' },
-
-  list: { paddingHorizontal: 20, paddingBottom: 24 },
-  card: {
-    backgroundColor: C.bgCard, borderRadius: 16, padding: 14,
-    borderWidth: 1, borderColor: C.border, marginBottom: 12, gap: 8,
-  },
+  list: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: TAB_BAR_SPACE },
+  card: { padding: 14, marginBottom: 12, gap: 8 },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tickerBadge: {
-    backgroundColor: C.bgCardLt, borderRadius: 6, paddingHorizontal: 8,
-    paddingVertical: 3, borderWidth: 1, borderColor: C.borderLt,
+    backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: R.pill, paddingHorizontal: 10, paddingVertical: 3,
+    borderWidth: 1, borderColor: C.border,
   },
   tickerText: { color: C.text, fontSize: 12, fontWeight: '700' },
   statusText: { fontSize: 11, fontWeight: '600' },
-  sentBadge: { marginLeft: 'auto', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  sentBadge: { marginLeft: 'auto', borderRadius: R.pill, paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1 },
   sentText: { fontSize: 11, fontWeight: '700' },
-  articleTitle: { color: C.textSec, fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  articleTitle: { color: C.text, fontSize: 14, fontWeight: '600', lineHeight: 20 },
   impactRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   impactLabel: { color: C.textMuted, fontSize: 11 },
-  impactValue: { color: C.textMuted, fontSize: 11, fontWeight: '600', minWidth: 28 },
-  explanation: { color: C.textMuted, fontSize: 12, lineHeight: 18 },
+  impactValue: { color: C.textSec, fontSize: 11, fontWeight: '600', minWidth: 28, textAlign: 'right' },
+  explanation: { color: C.textSec, fontSize: 12, lineHeight: 18 },
   signals: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  sigPos: { backgroundColor: '#052e16', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: '#166534' },
-  sigPosText: { color: '#4ade80', fontSize: 10, fontWeight: '600' },
-  sigNeg: { backgroundColor: '#2d0707', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: '#7f1d1d' },
-  sigNegText: { color: '#f87171', fontSize: 10, fontWeight: '600' },
+  sigPos: { backgroundColor: C.successSoft, borderRadius: R.pill, paddingHorizontal: 8, paddingVertical: 2 },
+  sigPosText: { color: C.success, fontSize: 10, fontWeight: '600' },
+  sigNeg: { backgroundColor: C.dangerSoft, borderRadius: R.pill, paddingHorizontal: 8, paddingVertical: 2 },
+  sigNegText: { color: '#FF8A8A', fontSize: 10, fontWeight: '600' },
   topics: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  topic: { backgroundColor: '#1e0d4e', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: C.accent },
+  topic: { backgroundColor: C.accentSoft, borderRadius: R.pill, paddingHorizontal: 8, paddingVertical: 2 },
   topicText: { color: C.accentLt, fontSize: 10, fontWeight: '600' },
-  dateText: { color: C.border, fontSize: 11, marginTop: 2 },
+  dateText: { color: C.textMuted, fontSize: 11, marginTop: 2 },
 });

@@ -1,77 +1,94 @@
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet } from 'react-native';
-import { C } from '../../src/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { C, shadow } from '../../src/theme';
 
-function HomeIcon({ color, focused }: { color: string; focused: boolean }) {
+type IconName = keyof typeof Ionicons.glyphMap;
+
+/**
+ * Ícone da tab bar flutuante (Figma): o item ativo vira um círculo índigo
+ * elevado acima da barra; os inativos ficam em cinza, sem rótulo.
+ */
+function TabIcon({ focused, outline, filled }: { focused: boolean; outline: IconName; filled: IconName }) {
   return (
-    <View style={[s.homeBtn, focused && s.homeBtnActive]}>
-      <Ionicons name="home" color={focused ? '#fff' : color} size={22} />
+    <View style={[s.icon, focused && s.iconActive]}>
+      <Ionicons name={focused ? filled : outline} size={22} color={focused ? '#fff' : C.tabInactive} />
     </View>
   );
 }
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  // Em telas largas (web/tablet) a barra não ocupa a largura toda: no máximo 560px, centralizada.
+  const barWidth = Math.min(width - 32, 560);
+  const barLeft = Math.round((width - barWidth) / 2);
+
   return (
     <Tabs
+      initialRouteName="home"
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: C.accentLt,
-        tabBarInactiveTintColor: C.textMuted,
+        sceneStyle: { backgroundColor: C.bg },
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: '#fff',
+        tabBarInactiveTintColor: C.tabInactive,
         tabBarStyle: {
-          backgroundColor: C.bgCard,
-          borderTopColor: C.border,
-          borderTopWidth: 1,
+          position: 'absolute',
+          left: barLeft,
+          width: barWidth,
+          bottom: Math.max(insets.bottom, 12),
           height: 64,
-          paddingBottom: 8,
-          paddingTop: 4,
+          borderRadius: 32,
+          backgroundColor: C.tabBar,
+          borderTopWidth: 0,
+          overflow: 'visible',
+          ...shadow.soft,
         },
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
+        tabBarItemStyle: { height: 64, justifyContent: 'center' },
+        tabBarIconStyle: { width: 56, height: 56 },
       }}
     >
-      <Tabs.Screen
-        name="portfolios"
-        options={{
-          title: 'Carteira',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="wallet-outline" color={color} size={size} />
-          ),
-        }}
-      />
+      {/* Ordem das abas segue o Figma: notícias, carteira, home, analytics, perfil */}
       <Tabs.Screen
         name="news"
         options={{
           title: 'Notícias',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="newspaper-outline" color={color} size={size} />
-          ),
+          tabBarAccessibilityLabel: 'Notícias',
+          tabBarIcon: ({ focused }) => <TabIcon focused={focused} outline="newspaper-outline" filled="newspaper" />,
+        }}
+      />
+      <Tabs.Screen
+        name="portfolios"
+        options={{
+          title: 'Carteira',
+          tabBarAccessibilityLabel: 'Carteira',
+          tabBarIcon: ({ focused }) => <TabIcon focused={focused} outline="wallet-outline" filled="wallet" />,
         }}
       />
       <Tabs.Screen
         name="home"
         options={{
-          title: '',
-          tabBarIcon: ({ color, focused }) => (
-            <HomeIcon color={color} focused={focused} />
-          ),
+          title: 'Início',
+          tabBarAccessibilityLabel: 'Início',
+          tabBarIcon: ({ focused }) => <TabIcon focused={focused} outline="home-outline" filled="home" />,
         }}
       />
       <Tabs.Screen
         name="analyses"
         options={{
           title: 'Análises',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="pulse-outline" color={color} size={size} />
-          ),
+          tabBarAccessibilityLabel: 'Análises',
+          tabBarIcon: ({ focused }) => <TabIcon focused={focused} outline="pie-chart-outline" filled="pie-chart" />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" color={color} size={size} />
-          ),
+          tabBarAccessibilityLabel: 'Perfil',
+          tabBarIcon: ({ focused }) => <TabIcon focused={focused} outline="person-outline" filled="person" />,
         }}
       />
     </Tabs>
@@ -79,21 +96,12 @@ export default function TabsLayout() {
 }
 
 const s = StyleSheet.create({
-  homeBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#2a1f5e',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  homeBtnActive: {
-    backgroundColor: '#7c3aed',
-    shadowColor: '#7c3aed',
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
+  icon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  iconActive: {
+    backgroundColor: C.accent,
+    borderWidth: 3,
+    borderColor: C.tabBar,
+    transform: [{ translateY: -14 }],
+    ...shadow.glow,
   },
 });

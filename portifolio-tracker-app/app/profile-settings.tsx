@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert,
+  View, Text, TouchableOpacity, StyleSheet,
+  KeyboardAvoidingView, Platform, ScrollView, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { C } from '../src/theme';
+import { C, R } from '../src/theme';
 import { DecoBackground } from '../src/components/ui/DecoBackground';
+import { FieldLabel, GlassCard, IconBubble, Input, PrimaryButton } from '../src/components/ui/primitives';
 import { useAuthStore } from '../src/store/authStore';
 import { changePassword } from '../src/services/auth';
 
@@ -60,6 +61,7 @@ export default function ProfileSettingsScreen() {
   }
 
   const profileDirty = username.trim() !== (user?.username ?? '') || cpf.trim() !== (user?.cpf ?? '');
+  const pwMismatch = confirmPw.length > 0 && newPw !== confirmPw;
 
   return (
     <View style={s.root}>
@@ -67,8 +69,8 @@ export default function ProfileSettingsScreen() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" color={C.text} size={22} />
+          <TouchableOpacity onPress={() => router.back()} hitSlop={8} accessibilityLabel="Voltar">
+            <IconBubble name="arrow-back" size={40} />
           </TouchableOpacity>
           <Text style={s.headerTitle}>Configurações de Perfil</Text>
           <View style={{ width: 40 }} />
@@ -77,96 +79,53 @@ export default function ProfileSettingsScreen() {
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-            {/* Profile info */}
-            <View style={s.section}>
+            {/* Informações pessoais */}
+            <GlassCard style={s.section}>
               <Text style={s.sectionTitle}>Informações Pessoais</Text>
 
-              <Text style={s.label}>Nome de usuário</Text>
-              <TextInput
-                style={s.input}
-                placeholder="seu_nome"
-                placeholderTextColor={C.textMuted}
-                autoCapitalize="none"
-                value={username}
-                onChangeText={setUsername}
-              />
+              <FieldLabel>Nome de usuário</FieldLabel>
+              <Input placeholder="seu_nome" autoCapitalize="none" value={username} onChangeText={setUsername} style={s.field} />
 
-              <Text style={s.label}>CPF</Text>
-              <TextInput
-                style={s.input}
-                placeholder="000.000.000-00"
-                placeholderTextColor={C.textMuted}
-                keyboardType="numeric"
-                value={cpf}
-                onChangeText={setCpf}
-              />
+              <FieldLabel>CPF</FieldLabel>
+              <Input placeholder="000.000.000-00" keyboardType="numeric" value={cpf} onChangeText={setCpf} style={s.field} />
 
-              <Text style={s.label}>E-mail</Text>
+              <FieldLabel>E-mail</FieldLabel>
               <View style={s.inputReadOnly}>
                 <Text style={s.inputReadOnlyText}>{user?.email}</Text>
                 <Ionicons name="lock-closed-outline" color={C.textMuted} size={14} />
               </View>
 
-              <TouchableOpacity
-                style={[s.btn, (!profileDirty || saving) && s.btnDisabled]}
+              <PrimaryButton
+                label="Salvar alterações"
                 onPress={handleSaveProfile}
-                disabled={!profileDirty || saving}
-              >
-                {saving
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={s.btnText}>Salvar alterações</Text>
-                }
-              </TouchableOpacity>
-            </View>
+                disabled={!profileDirty}
+                loading={saving}
+                style={s.button}
+              />
+            </GlassCard>
 
-            {/* Change password */}
-            <View style={s.section}>
+            {/* Alterar senha */}
+            <GlassCard style={s.section}>
               <Text style={s.sectionTitle}>Alterar Senha</Text>
 
-              <Text style={s.label}>Senha atual</Text>
-              <TextInput
-                style={s.input}
-                placeholder="••••••••"
-                placeholderTextColor={C.textMuted}
-                secureTextEntry
-                value={currentPw}
-                onChangeText={setCurrentPw}
-              />
+              <FieldLabel>Senha atual</FieldLabel>
+              <Input placeholder="••••••••" secureTextEntry value={currentPw} onChangeText={setCurrentPw} style={s.field} />
 
-              <Text style={s.label}>Nova senha</Text>
-              <TextInput
-                style={s.input}
-                placeholder="Mínimo 6 caracteres"
-                placeholderTextColor={C.textMuted}
-                secureTextEntry
-                value={newPw}
-                onChangeText={setNewPw}
-              />
+              <FieldLabel>Nova senha</FieldLabel>
+              <Input placeholder="Mínimo 6 caracteres" secureTextEntry value={newPw} onChangeText={setNewPw} style={s.field} />
 
-              <Text style={s.label}>Confirmar nova senha</Text>
-              <TextInput
-                style={[s.input, confirmPw.length > 0 && newPw !== confirmPw && s.inputError]}
+              <FieldLabel>Confirmar nova senha</FieldLabel>
+              <Input
                 placeholder="Repita a nova senha"
-                placeholderTextColor={C.textMuted}
                 secureTextEntry
                 value={confirmPw}
                 onChangeText={setConfirmPw}
+                style={[s.field, pwMismatch && s.inputError]}
               />
-              {confirmPw.length > 0 && newPw !== confirmPw && (
-                <Text style={s.errorHint}>As senhas não coincidem</Text>
-              )}
+              {pwMismatch && <Text style={s.errorHint}>As senhas não coincidem</Text>}
 
-              <TouchableOpacity
-                style={[s.btn, changingPw && s.btnDisabled]}
-                onPress={handleChangePassword}
-                disabled={changingPw}
-              >
-                {changingPw
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={s.btnText}>Alterar senha</Text>
-                }
-              </TouchableOpacity>
-            </View>
+              <PrimaryButton label="Alterar senha" onPress={handleChangePassword} loading={changingPw} style={s.button} />
+            </GlassCard>
 
           </ScrollView>
         </KeyboardAvoidingView>
@@ -182,41 +141,22 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingVertical: 14,
   },
-  backBtn: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: C.bgCard, borderWidth: 1, borderColor: C.border,
-    justifyContent: 'center', alignItems: 'center',
-  },
   headerTitle: { color: C.text, fontSize: 18, fontWeight: '700' },
 
-  scroll: { paddingHorizontal: 20, paddingBottom: 48, gap: 24 },
+  scroll: { paddingHorizontal: 20, paddingBottom: 48, gap: 20, width: '100%', maxWidth: 560, alignSelf: 'center' },
 
-  section: {
-    backgroundColor: C.bgCard, borderRadius: 18, padding: 18,
-    borderWidth: 1, borderColor: C.border, gap: 8,
-  },
-  sectionTitle: { color: C.text, fontSize: 15, fontWeight: '700', marginBottom: 4 },
-
-  label: { color: C.textMuted, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
-
-  input: {
-    backgroundColor: C.bgCardLt, borderWidth: 1, borderColor: C.border,
-    borderRadius: 12, padding: 14, color: C.text, fontSize: 15,
-  },
+  section: { padding: 18, borderRadius: R.xl },
+  sectionTitle: { color: C.text, fontSize: 16, fontWeight: '700', marginBottom: 14 },
+  field: { marginBottom: 14 },
   inputError: { borderColor: C.danger },
-  errorHint: { color: C.danger, fontSize: 12, marginTop: -4 },
+  errorHint: { color: '#FF8A8A', fontSize: 12, marginTop: -8, marginBottom: 10 },
 
   inputReadOnly: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: C.bgCardLt, borderWidth: 1, borderColor: C.border,
-    borderRadius: 12, padding: 14, opacity: 0.6,
+    height: 52, paddingHorizontal: 16, borderRadius: R.md,
+    backgroundColor: C.bgInput, borderWidth: 1, borderColor: C.border, opacity: 0.7, marginBottom: 14,
   },
   inputReadOnlyText: { color: C.textMuted, fontSize: 15 },
 
-  btn: {
-    backgroundColor: C.accent, borderRadius: 12, padding: 15,
-    alignItems: 'center', marginTop: 6,
-  },
-  btnDisabled: { opacity: 0.4 },
-  btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  button: { marginTop: 4 },
 });
