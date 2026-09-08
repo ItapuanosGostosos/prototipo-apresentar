@@ -195,6 +195,37 @@ export function ScreenHeader({ title, subtitle, right }: { title: string; subtit
   );
 }
 
+// ─── Cabeçalho de subtela (voltar + título) ──────────────────────────────────
+
+export function BackHeader({ title, onBack, right }: { title: string; onBack: () => void; right?: ReactNode }) {
+  return (
+    <View style={st.backHeader}>
+      <TouchableOpacity onPress={onBack} hitSlop={8} accessibilityLabel="Voltar" accessibilityRole="button">
+        <IconBubble name="arrow-back" size={40} />
+      </TouchableOpacity>
+      <Text style={st.backTitle} numberOfLines={1}>{title}</Text>
+      <View style={st.backRight}>{right}</View>
+    </View>
+  );
+}
+
+// ─── Aviso inline (funciona também no web, onde Alert.alert não exibe nada) ───
+
+export function Notice({ kind = 'info', children }: { kind?: 'info' | 'success' | 'error' | 'warning'; children: ReactNode }) {
+  const palette = {
+    info: { bg: C.infoSoft, fg: C.info, icon: 'information-circle-outline' as IconName },
+    success: { bg: C.successSoft, fg: C.success, icon: 'checkmark-circle-outline' as IconName },
+    error: { bg: C.dangerSoft, fg: '#FF8A8A', icon: 'alert-circle-outline' as IconName },
+    warning: { bg: C.warningSoft, fg: C.warning, icon: 'warning-outline' as IconName },
+  }[kind];
+  return (
+    <View style={[st.notice, { backgroundColor: palette.bg, borderColor: palette.fg + '55' }]} accessibilityRole="alert">
+      <Ionicons name={palette.icon} size={18} color={palette.fg} style={{ marginTop: 1 }} />
+      <Text style={[st.noticeText, { color: palette.fg }]}>{children}</Text>
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
   glass: { backgroundColor: C.bgCard, borderWidth: 1, borderColor: C.border, borderRadius: R.lg },
   glassStrong: { backgroundColor: C.bgCardLt, borderColor: C.borderLt },
@@ -262,4 +293,11 @@ const st = StyleSheet.create({
   },
   headerTitle: { color: C.text, fontSize: 26, fontWeight: '700', letterSpacing: -0.3 },
   headerSub: { color: C.textMuted, fontSize: 12, marginTop: 2 },
+
+  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  backTitle: { flex: 1, color: C.text, fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  backRight: { width: 40, alignItems: 'flex-end' },
+
+  notice: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderWidth: 1, borderRadius: R.sm, padding: 12 },
+  noticeText: { flex: 1, fontSize: 13, lineHeight: 19 },
 });

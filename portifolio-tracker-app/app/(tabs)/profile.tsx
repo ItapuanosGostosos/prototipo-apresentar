@@ -8,11 +8,13 @@ import { DecoBackground } from '../../src/components/ui/DecoBackground';
 import { DangerButton, GlassCard, IconBubble, type IconName } from '../../src/components/ui/primitives';
 import { useAuthStore } from '../../src/store/authStore';
 
-const MENU_ITEMS: { id: string; icon: IconName; label: string }[] = [
-  { id: 'settings',   icon: 'person-outline',           label: 'Configurações de Perfil' },
-  { id: 'notifs',     icon: 'notifications-outline',    label: 'Notificações' },
-  { id: 'privacy',    icon: 'shield-checkmark-outline', label: 'Política de Privacidade' },
-  { id: 'help',       icon: 'headset-outline',          label: 'Ajuda & Suporte' },
+type MenuRoute = '/profile-settings' | '/notifications' | '/privacy-policy' | '/help';
+
+const MENU_ITEMS: { id: string; icon: IconName; label: string; description: string; route: MenuRoute }[] = [
+  { id: 'settings', icon: 'person-outline',           label: 'Configurações de Perfil', description: 'Nome de usuário, CPF e senha',        route: '/profile-settings' },
+  { id: 'notifs',   icon: 'notifications-outline',    label: 'Notificações',            description: 'Permissão e alertas de notícias',   route: '/notifications' },
+  { id: 'privacy',  icon: 'shield-checkmark-outline', label: 'Política de Privacidade', description: 'Como tratamos seus dados (LGPD)',    route: '/privacy-policy' },
+  { id: 'help',     icon: 'headset-outline',          label: 'Ajuda & Suporte',         description: 'Perguntas frequentes e contato',     route: '/help' },
 ];
 
 export default function ProfileScreen() {
@@ -45,24 +47,24 @@ export default function ProfileScreen() {
 
           {/* Menu (linhas translúcidas com ícone e chevron) */}
           <View style={s.menu}>
-            {MENU_ITEMS.map((item) => {
-              const enabled = item.id === 'settings';
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  activeOpacity={0.8}
-                  disabled={!enabled}
-                  onPress={enabled ? () => router.push('/profile-settings') : undefined}
-                  accessibilityRole="button"
-                >
-                  <GlassCard style={[s.menuItem, !enabled && s.menuItemDisabled]}>
-                    <IconBubble name={item.icon} size={38} color={C.textSec} />
+            {MENU_ITEMS.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                activeOpacity={0.8}
+                onPress={() => router.push(item.route)}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
+              >
+                <GlassCard style={s.menuItem}>
+                  <IconBubble name={item.icon} size={38} color={C.textSec} />
+                  <View style={{ flex: 1 }}>
                     <Text style={s.menuLabel}>{item.label}</Text>
-                    <Ionicons name="chevron-forward" color={C.textMuted} size={18} />
-                  </GlassCard>
-                </TouchableOpacity>
-              );
-            })}
+                    <Text style={s.menuDesc}>{item.description}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" color={C.textMuted} size={18} />
+                </GlassCard>
+              </TouchableOpacity>
+            ))}
           </View>
 
           <DangerButton label="Sair da conta" onPress={handleLogout} style={s.logout} />
@@ -88,8 +90,8 @@ const s = StyleSheet.create({
 
   menu: { width: '100%', gap: 10 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: R.lg },
-  menuItemDisabled: { opacity: 0.55 },
-  menuLabel: { color: C.text, fontSize: 15, fontWeight: '500', flex: 1 },
+  menuLabel: { color: C.text, fontSize: 15, fontWeight: '500' },
+  menuDesc: { color: C.textMuted, fontSize: 12, marginTop: 2 },
 
   logout: { alignSelf: 'center', minWidth: 200, marginTop: 28 },
 });
