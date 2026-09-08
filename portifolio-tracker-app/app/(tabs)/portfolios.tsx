@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, FlatList, TextInput,
   Modal, ActivityIndicator, Alert, ScrollView,
   TouchableWithoutFeedback, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { C } from '../../src/theme';
@@ -30,6 +30,44 @@ const TYPE_COLORS: Record<AssetType, { bg: string; text: string }> = {
   etf:    { bg: '#3a2a0a', text: '#fbbf24' },
   bdr:    { bg: '#1e2a40', text: '#38bdf8' },
 };
+
+/**
+ * Bottom sheet compartilhado pelos modais de criar portfólio e adicionar ativo.
+ * - Altura definida pelo conteúdo (sem alturas fixas), encolhendo e rolando se não couber.
+ * - iOS: KeyboardAvoidingView "padding" empurra o sheet acima do teclado.
+ * - Android: a janela do Modal já redimensiona com o teclado (adjustResize), então não
+ *   compensamos de novo — evita o espaço vazio acima dos campos.
+ * - Toque no fundo escuro fecha; o conteúdo do sheet não propaga o toque.
+ */
+function SheetModal({ visible, title, onClose, children }: {
+  visible: boolean; title: string; onClose: () => void; children: ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={s.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <TouchableWithoutFeedback onPress={onClose} accessibilityLabel="Fechar">
+          <View style={s.overlayBackdrop} />
+        </TouchableWithoutFeedback>
+        <View style={s.sheet}>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            bounces={false}
+            contentContainerStyle={[s.sheetContent, { paddingBottom: Math.max(insets.bottom, 16) }]}
+          >
+            <View style={s.sheetHeader}>
+              <Text style={s.sheetTitle}>{title}</Text>
+              <TouchableOpacity onPress={onClose} hitSlop={8} accessibilityLabel="Fechar">
+                <Ionicons name="close" color={C.textMuted} size={20} />
+              </TouchableOpacity>
+            </View>
+            {children}
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
 
 export default function PortfoliosScreen() {
   const qc = useQueryClient();
@@ -172,81 +210,63 @@ export default function PortfoliosScreen() {
         )}
 
         {/* Modal: criar portfólio */}
-        <Modal visible={showCreate} transparent animationType="slide" onRequestClose={() => setShowCreate(false)}>
-          <TouchableWithoutFeedback onPress={() => setShowCreate(false)}>
-            <View style={s.overlay}>
-              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                <View style={s.sheet} onStartShouldSetResponder={() => true}>
-                  <Text style={s.sheetTitle}>Novo portfólio</Text>
-                  <TextInput
-                    style={s.input}
-                    placeholder="Nome do portfólio"
-                    placeholderTextColor={C.textMuted}
-                    value={newName}
-                    onChangeText={setNewName}
-                  />
-                  <TouchableOpacity
-                    style={[s.sheetBtn, !newName.trim() && { opacity: 0.4 }]}
-                    disabled={!newName.trim() || createMutation.isPending}
-                    onPress={() => createMutation.mutate(newName.trim())}
-                  >
-                    {createMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={s.sheetBtnText}>Criar</Text>}
-                  </TouchableOpacity>
-                </View>
-              </KeyboardAvoidingView>
-            </View>
-          </TouchableWithoutFeedback>
-        </Modal>
+        <SheetModal visible={showCreate} title="Novo portfólio" onClose={() => setShowCreate(false)}>
+          <TextInput
+            style={s.input}
+            placeholder="Nome do portfólio"
+            placeholderTextColor={C.textMuted}
+            value={newName}
+            onChangeText={setNewName}
+          />
+          <TouchableOpacity
+            style={[s.sheetBtn, !newName.trim() && { opacity: 0.4 }]}
+            disabled={!newName.trim() || createMutation.isPending}
+            onPress={() => createMutation.mutate(newName.trim())}
+          >
+            {createMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={s.sheetBtnText}>Criar</Text>}
+          </TouchableOpacity>
+        </SheetModal>
 
         {/* Modal: adicionar ativo */}
-        <Modal visible={showAddAsset} transparent animationType="slide" onRequestClose={() => setShowAddAsset(false)}>
-          <TouchableWithoutFeedback onPress={() => setShowAddAsset(false)}>
-            <View style={s.overlay}>
-              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-                <View style={s.sheet} onStartShouldSetResponder={() => true}>
-                  <Text style={s.sheetTitle}>Adicionar ativo</Text>
-                  <Text style={s.inputLabel}>Ticker</Text>
-                  <TextInput
-                    style={s.input}
-                    placeholder="Ex: PETR4, BTC"
-                    placeholderTextColor={C.textMuted}
-                    value={ticker}
-                    onChangeText={setTicker}
-                    autoCapitalize="characters"
-                  />
-                  <Text style={s.inputLabel}>Nome</Text>
-                  <TextInput
-                    style={s.input}
-                    placeholder="Ex: Petrobras PN"
-                    placeholderTextColor={C.textMuted}
-                    value={assetName}
-                    onChangeText={setAssetName}
-                  />
-                  <Text style={s.inputLabel}>Tipo</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
-                    {ASSET_TYPES.map((t) => (
-                      <TouchableOpacity
-                        key={t.value}
-                        style={[s.typeOpt, assetType === t.value && s.typeOptActive]}
-                        onPress={() => setAssetType(t.value)}
-                      >
-                        <Text>{t.icon}</Text>
-                        <Text style={[s.typeOptText, assetType === t.value && s.typeOptTextActive]}>{t.label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                  <TouchableOpacity
-                    style={[s.sheetBtn, (!ticker.trim() || !assetName.trim()) && { opacity: 0.4 }]}
-                    disabled={!ticker.trim() || !assetName.trim() || addMutation.isPending}
-                    onPress={() => addMutation.mutate()}
-                  >
-                    {addMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={s.sheetBtnText}>Adicionar</Text>}
-                  </TouchableOpacity>
-                </View>
-              </KeyboardAvoidingView>
-            </View>
-          </TouchableWithoutFeedback>
-        </Modal>
+        <SheetModal visible={showAddAsset} title="Adicionar ativo" onClose={() => setShowAddAsset(false)}>
+          <Text style={s.inputLabel}>Ticker</Text>
+          <TextInput
+            style={s.input}
+            placeholder="Ex: PETR4, BTC"
+            placeholderTextColor={C.textMuted}
+            value={ticker}
+            onChangeText={setTicker}
+            autoCapitalize="characters"
+          />
+          <Text style={s.inputLabel}>Nome</Text>
+          <TextInput
+            style={s.input}
+            placeholder="Ex: Petrobras PN"
+            placeholderTextColor={C.textMuted}
+            value={assetName}
+            onChangeText={setAssetName}
+          />
+          <Text style={s.inputLabel}>Tipo</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.typeScroll} keyboardShouldPersistTaps="handled">
+            {ASSET_TYPES.map((t) => (
+              <TouchableOpacity
+                key={t.value}
+                style={[s.typeOpt, assetType === t.value && s.typeOptActive]}
+                onPress={() => setAssetType(t.value)}
+              >
+                <Text>{t.icon}</Text>
+                <Text style={[s.typeOptText, assetType === t.value && s.typeOptTextActive]}>{t.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            style={[s.sheetBtn, (!ticker.trim() || !assetName.trim()) && { opacity: 0.4 }]}
+            disabled={!ticker.trim() || !assetName.trim() || addMutation.isPending}
+            onPress={() => addMutation.mutate()}
+          >
+            {addMutation.isPending ? <ActivityIndicator color="#fff" /> : <Text style={s.sheetBtnText}>Adicionar</Text>}
+          </TouchableOpacity>
+        </SheetModal>
       </SafeAreaView>
     </View>
   );
@@ -267,8 +287,10 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: C.border,
   },
   addPortfolioBtnText: { color: C.accentLt, fontWeight: '600', fontSize: 14 },
-  tabScroll: { height: 72, marginBottom: 8 },
-  tabRow: { paddingHorizontal: 20, gap: 10, alignItems: 'center' },
+  // Sem altura fixa: o ScrollView horizontal herda flexGrow: 1 e ocupava espaço demais;
+  // a linha de abas passa a ter a altura do próprio conteúdo.
+  tabScroll: { flexGrow: 0, flexShrink: 0, marginBottom: 4 },
+  tabRow: { paddingHorizontal: 20, paddingVertical: 4, gap: 10, alignItems: 'flex-start' },
   tab: {
     backgroundColor: C.bgCard, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10,
     borderWidth: 1, borderColor: C.border, minWidth: 110,
@@ -280,7 +302,8 @@ const s = StyleSheet.create({
 
   assetHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 10,
+    marginTop: 4,
   },
   assetSectionTitle: { color: C.text, fontSize: 18, fontWeight: '600' },
   addAssetBtn: {
@@ -310,16 +333,21 @@ const s = StyleSheet.create({
   },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  overlayBackdrop: { flexGrow: 1, flexShrink: 0, minHeight: 48 },
   sheet: {
     backgroundColor: C.bgCard, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, paddingBottom: 40, borderTopWidth: 1, borderColor: C.border,
+    borderTopWidth: 1, borderColor: C.border,
+    width: '100%', maxWidth: 560, alignSelf: 'center', flexShrink: 1,
   },
-  sheetTitle: { color: C.text, fontSize: 20, fontWeight: '700', marginBottom: 20 },
+  sheetContent: { paddingHorizontal: 20, paddingTop: 16 },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sheetTitle: { color: C.text, fontSize: 18, fontWeight: '700' },
   inputLabel: { color: C.textSec, fontSize: 12, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 },
   input: {
     backgroundColor: C.bgInput, borderWidth: 1, borderColor: C.border,
-    borderRadius: 10, padding: 14, color: C.text, fontSize: 15, marginBottom: 16,
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, color: C.text, fontSize: 15, marginBottom: 12,
   },
+  typeScroll: { flexGrow: 0, marginBottom: 16 },
   typeOpt: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8,
@@ -329,7 +357,7 @@ const s = StyleSheet.create({
   typeOptText: { color: C.textMuted, fontWeight: '600', fontSize: 13 },
   typeOptTextActive: { color: C.accentLt },
   sheetBtn: {
-    backgroundColor: C.accent, borderRadius: 12, padding: 16, alignItems: 'center',
+    backgroundColor: C.accent, borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 4,
   },
   sheetBtnText: { color: '#fff', fontWeight: '600', fontSize: 16 },
 });
