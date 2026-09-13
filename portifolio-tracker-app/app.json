@@ -17,7 +17,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.portifoliotracker.app",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -40,9 +42,11 @@
       "expo-router"
     ],
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "SEU_EAS_PROJECT_ID_AQUI"
+        "projectId": "f97e0fea-dd37-4f75-831c-3ad7e243ced2"
       }
-    }
+    },
+    "owner": "matheuscosta616"
   }
 }
