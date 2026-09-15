@@ -29,6 +29,7 @@
       },
       "package": "com.portifoliotracker.app",
       "edgeToEdgeEnabled": true,
+      "usesCleartextTraffic": true,
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
@@ -45,7 +46,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f97e0fea-dd37-4f75-831c-3ad7e243ced2"
+        "projectId": "962786b5-ad95-4b83-9f91-aa687471a248"
       }
     },
     "owner": "matheuscosta616"

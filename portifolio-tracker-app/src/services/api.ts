@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export function getApiBaseUrl(): string {
-  return 'http://52.3.97.206:8000/api';
+  return process.env.EXPO_PUBLIC_API_URL || 'http://52.3.97.206:8000/api';
 }
 
 export const API_BASE_URL = getApiBaseUrl();
