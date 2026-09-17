@@ -31,6 +31,31 @@ class TestRegister:
             response = api_client.post(url, data)
         assert response.status_code == 400
 
+    def test_register_allows_same_username_for_different_emails(self, api_client):
+        url = reverse('auth-register')
+        first = {'email': 'first@example.com', 'username': 'same-name', 'password': 'strongpass123'}
+        second = {'email': 'second@example.com', 'username': 'same-name', 'password': 'strongpass123'}
+        with patch('users.controller.KeycloakService.register_user',
+                   return_value=_mock_keycloak_response(201)):
+            assert api_client.post(url, first).status_code == 201
+            assert api_client.post(url, second).status_code == 201
+
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        assert User.objects.filter(username='same-name').count() == 2
+
+    def test_register_uses_email_as_keycloak_username(self, api_client):
+        url = reverse('auth-register')
+        data = {'email': 'first@example.com', 'username': 'same-name', 'password': 'strongpass123'}
+        with patch('users.controller.KeycloakService.register_user',
+                   return_value=_mock_keycloak_response(201)) as register_user:
+            response = api_client.post(url, data)
+
+        assert response.status_code == 201
+        register_user.assert_called_once_with(data)
+        payload = register_user.call_args.args[0]
+        assert payload['email'] != payload['username']
+
     def test_register_weak_password(self, api_client):
         url = reverse('auth-register')
         data = {'email': 'new@example.com', 'username': 'x', 'password': '123'}
@@ -72,6 +97,18 @@ class TestLogin:
                    return_value=_mock_keycloak_response(401, ok=False)):
             response = api_client.post(url, {'email': 'nobody@example.com', 'password': 'pass'})
         assert response.status_code == 401
+
+    def test_login_creates_local_user_for_new_email(self, api_client):
+        url = reverse('auth-login')
+        mock_resp = _mock_keycloak_response(200)
+        mock_resp.json.return_value = {'access_token': 'tok', 'refresh_token': 'ref'}
+        with patch('users.controller.KeycloakService.login', return_value=mock_resp):
+            response = api_client.post(url, {'email': 'new@example.com', 'password': 'strongpass123'})
+
+        assert response.status_code == 200
+        from django.contrib.auth import get_user_model
+        user = get_user_model().objects.get(email='new@example.com')
+        assert user.username == 'new@example.com'
 
     def test_login_missing_fields_returns_400(self, api_client):
         url = reverse('auth-login')

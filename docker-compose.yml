@@ -118,7 +118,7 @@ services:
       - KEYCLOAK_CLIENT_ID=portfolio-api
       - CELERY_BROKER_URL=amqp://portfolio:portfolio123@rabbitmq:5672/
       - CELERY_RESULT_BACKEND=rpc://
-    command: >
+    command: 
       celery -A portifolio_tracker_api worker
       --loglevel=info
       -Q sentiment_analysis

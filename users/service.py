@@ -21,7 +21,7 @@ class KeycloakService:
         admin_token = KeycloakService.admin_token()
         url = f"{settings.KEYCLOAK_SERVER_URL}/admin/realms/{settings.KEYCLOAK_REALM}/users"
         return requests.post(url, json={
-            'username': data['username'],
+            'username': data['email'],
             'email': data['email'],
             'firstName': data['username'],
             'lastName': data['username'],

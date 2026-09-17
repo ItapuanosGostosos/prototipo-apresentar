@@ -1,9 +1,12 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.contrib.auth import get_user_model
 
 from .dto import ChangePasswordSerializer, RegisterSerializer, UserSerializer
 from .service import KeycloakService
+
+User = get_user_model()
 
 
 class RegisterView(APIView):
@@ -27,6 +30,11 @@ class RegisterView(APIView):
 
         if not resp.ok:
             return Response({'detail': 'Erro ao criar conta.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        User.objects.get_or_create(
+            email=data['email'],
+            defaults={'username': data['username']},
+        )
 
         return Response({'email': data['email'], 'username': data['username']}, status=status.HTTP_201_CREATED)
 
@@ -56,6 +64,7 @@ class LoginView(APIView):
         if not resp.ok:
             return Response({'detail': 'Erro ao autenticar.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
+        User.objects.get_or_create(email=email, defaults={'username': email})
         data = resp.json()
         return Response({
             'access': data['access_token'],
