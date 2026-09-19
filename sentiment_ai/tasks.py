@@ -59,6 +59,8 @@ def _mark_retry_or_failure(analysis_id: int, error: Exception, final: bool) -> N
     bind=True,
     name="sentiment_ai.process_analysis",
     max_retries=3,
+    soft_time_limit=150,
+    time_limit=180,
     acks_late=True,
     reject_on_worker_lost=True,
 )

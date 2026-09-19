@@ -145,7 +145,7 @@ export default function NewsScreen() {
     mutationFn: (id: number) => analysePortfolio(id),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['analyses'] });
-      Alert.alert('Análise iniciada', `${data.articles_queued} artigos enfileirados.\nVeja os resultados em Análises.`);
+      Alert.alert('Análise iniciada', `Tarefa ${data.task_id} enfileirada.\nVeja os resultados em Análises.`);
     },
     onError: (err: Error) => Alert.alert('Erro', err.message),
   });

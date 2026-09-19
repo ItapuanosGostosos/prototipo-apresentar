@@ -141,6 +141,8 @@ CORS_ALLOW_ALL_ORIGINS = True
 CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='amqp://guest:guest@localhost:5672/')
 CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='rpc://')
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+CELERY_TASK_SOFT_TIME_LIMIT = 240
+CELERY_TASK_TIME_LIMIT = 300
 
 from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {

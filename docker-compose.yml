@@ -62,7 +62,7 @@ services:
       - "8000:8000"
     command: >
       bash -c "python manage.py migrate --fake-initial &&
-               gunicorn --bind 0.0.0.0:8000 portifolio_tracker_api.wsgi:application"
+               gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 60 portifolio_tracker_api.wsgi:application"
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/8000'"]
       interval: 10s
@@ -92,7 +92,7 @@ services:
       - KEYCLOAK_CLIENT_ID=portfolio-api
       - CELERY_BROKER_URL=amqp://portfolio:portfolio123@rabbitmq:5672/
       - CELERY_RESULT_BACKEND=rpc://
-    command: celery -A portifolio_tracker_api worker --loglevel=info
+    command: celery -A portifolio_tracker_api worker --loglevel=info --soft-time-limit=240 --time-limit=300
 
   sentiment-worker:
     build:
@@ -124,6 +124,8 @@ services:
       -Q sentiment_analysis
       --concurrency=1
       --prefetch-multiplier=1
+      --soft-time-limit=150
+      --time-limit=180
 
   celery-beat:
     build: .

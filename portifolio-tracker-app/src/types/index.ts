@@ -133,8 +133,8 @@ export interface Analysis {
 }
 
 export interface AnalysePortfolioResponse {
-  articles_queued: number;
-  analyses: Analysis[];
+  task_id: string;
+  status: 'queued';
 }
 
 // ─── Notifications ───────────────────────────────────────────────────────────

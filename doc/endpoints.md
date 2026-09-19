@@ -16,6 +16,10 @@
 | GET | `/api/news/portfolio/{id}/` | Sim | Notícias de uma carteira |
 | POST/DELETE | `/api/notifications/device-token/` | Sim | Registrar/desativar token FCM |
 
+`POST /api/portfolios/{id}/analyse` responde `202 Accepted` com `task_id` e
+`status: queued`. A busca externa e a criação das análises acontecem no Celery;
+consulte `GET /api/portfolios/{id}/analyses` para acompanhar os estados.
+
 ---
 
 ## Como Criar um Novo Endpoint

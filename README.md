@@ -97,13 +97,16 @@ O backend é completamente desacoplado de autenticação — toda identidade é 
 POST /api/portfolios/{id}/analyse
         │
         ├─ busca tickers da carteira
-        ├─ chama YFinanceFetcher.fetch(tickers)
-        ├─ salva NewsArticle no banco (se novo)
-        ├─ chama sentiment_ai.services.request_analysis()
+        ├─ enfileira portfolios.tasks.analyse_portfolio
+        ├─ task chama YFinanceFetcher.fetch(tickers) e salva NewsArticle
+        ├─ task chama sentiment_ai.services.request_analysis()
         │        └─ cria Analysis(status=PENDING) e publica na fila
         │
         ▼
-  Sentiment Worker consome a fila
+    A API responde 202 + task_id imediatamente
+      └─ cliente consulta GET /api/portfolios/{id}/analyses
+
+    Sentiment Worker consome a fila
         ├─ processa o artigo com o modelo de LM
         ├─ atualiza Analysis(status=COMPLETED, analise=JSON)
         └─ retorna resultado via GET /api/portfolios/{id}/analyses

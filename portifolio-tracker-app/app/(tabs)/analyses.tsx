@@ -117,7 +117,7 @@ export default function AnalysesScreen() {
     mutationFn: () => analysePortfolio(selectedId!),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['analyses', selectedId] });
-      Alert.alert('Análise iniciada', `${data.articles_queued} artigos enfileirados.\nAtualize em instantes.`);
+      Alert.alert('Análise iniciada', `Tarefa ${data.task_id} enfileirada.\nAtualize em instantes.`);
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   });
