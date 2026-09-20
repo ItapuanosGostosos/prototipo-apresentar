@@ -1,17 +1,23 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, RefreshControl, ScrollView, Alert, Linking,
+  ActivityIndicator, RefreshControl, ScrollView, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { C, R, TAB_BAR_SPACE } from '../../src/theme';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
+import { C, R, TAB_BAR_SPACE, CONTENT_MAX_WIDTH } from '../../src/theme';
 import { DecoBackground } from '../../src/components/ui/DecoBackground';
 import { Chip, EmptyState, GhostButton, GlassCard, ScreenHeader } from '../../src/components/ui/primitives';
+import { UserAvatar } from '../../src/components/ui/UserAvatar';
 import { listPortfolios } from '../../src/services/portfolios';
 import { listAnalyses, analysePortfolio } from '../../src/services/analyses';
 import type { Analysis, PortfolioListItem, SentimentLabel } from '../../src/types';
+import {
+  PERIODS, buildPeriodImpact, countsSentence, filterByPeriod, impactSentence,
+  VERDICT_TEXT, type PeriodImpact, type PeriodKey, type TickerImpact, type Verdict,
+} from '../../src/utils/sentiment';
+import { notify } from '../../src/utils/feedback';
 
 const SENT: Record<SentimentLabel, { label: string; color: string; bg: string }> = {
   positive: { label: 'Positivo', color: C.success, bg: C.successSoft },
@@ -26,26 +32,133 @@ const STATUS: Record<string, { label: string; color: string }> = {
   failed:     { label: 'Falhou',      color: '#FF8A8A' },
 };
 
-const TIME_FILTERS = ['1S', '1M', '3M', '6M', '1A'];
+const VERDICT_COLOR: Record<Verdict, string> = {
+  favorable: C.success,
+  neutral: C.warning,
+  unfavorable: '#FF8A8A',
+};
 
-function ScoreBar({ score }: { score: number }) {
-  const pct = Math.min(Math.max(score, 0), 1);
-  const color = pct >= 0.6 ? C.success : pct >= 0.35 ? C.warning : '#FF8A8A';
+/** Linha exibida: a análise + de quais carteiras aquele ticker faz parte. */
+type Row = { analysis: Analysis; portfolioNames: string[] };
+
+// ─── Barra divergente (impact_score vai de -1 a 1) ───────────────────────────
+
+function NetBar({ net, height = 6 }: { net: number; height?: number }) {
+  const clamped = Math.max(-1, Math.min(1, net));
+  const half = Math.abs(clamped) * 50;
+  const color = VERDICT_COLOR[clamped >= 0.15 ? 'favorable' : clamped <= -0.15 ? 'unfavorable' : 'neutral'];
   return (
-    <View style={b.wrap}>
-      <View style={[b.fill, { width: `${Math.round(pct * 100)}%` as any, backgroundColor: color }]} />
+    <View style={[b.track, { height, borderRadius: height / 2 }]}>
+      <View style={b.zero} />
+      <View
+        style={[
+          b.fill,
+          { width: `${half}%` as any, backgroundColor: color },
+          clamped >= 0 ? { left: '50%' } : { right: '50%' },
+        ]}
+      />
     </View>
   );
 }
+
 const b = StyleSheet.create({
-  wrap: { flex: 1, height: 5, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 3, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 3 },
+  track: { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden', justifyContent: 'center' },
+  zero: { position: 'absolute', left: '50%', width: 1, top: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.28)' },
+  fill: { position: 'absolute', top: 0, bottom: 0 },
 });
 
-function AnalysisCard({ item }: { item: Analysis }) {
+function signedPct(net: number): string {
+  const v = Math.round(net * 100);
+  return `${v > 0 ? '+' : ''}${v}%`;
+}
+
+// ─── Resumo de impacto do período ────────────────────────────────────────────
+
+function TickerRow({ t }: { t: TickerImpact }) {
+  const color = VERDICT_COLOR[t.verdict];
+  return (
+    <View style={s.tickerRow}>
+      <View style={s.tickerRowHead}>
+        <View style={s.tickerBadge}><Text style={s.tickerText}>{t.ticker}</Text></View>
+        <Text style={s.tickerCounts} numberOfLines={1}>{countsSentence(t)}</Text>
+        <Text style={[s.tickerVerdict, { color }]}>{signedPct(t.net)}</Text>
+      </View>
+      <View style={s.tickerBarRow}>
+        <NetBar net={t.net} height={5} />
+        <Text style={[s.tickerVerdictWord, { color }]}>{VERDICT_TEXT[t.verdict].short}</Text>
+      </View>
+    </View>
+  );
+}
+
+function ImpactSummary({ impact, period }: { impact: PeriodImpact; period: PeriodKey }) {
+  const color = VERDICT_COLOR[impact.verdict];
+  const icon = impact.verdict === 'favorable'
+    ? 'trending-up'
+    : impact.verdict === 'unfavorable' ? 'trending-down' : 'remove-outline';
+
+  return (
+    <GlassCard style={s.summary} strong>
+      <View style={s.summaryHead}>
+        <Ionicons name="analytics-outline" size={16} color={C.accentLt} />
+        <Text style={s.summaryTitle}>Impacto geral do período</Text>
+        <View style={[s.verdictPill, { backgroundColor: color + '22', borderColor: color + '66' }]}>
+          <Ionicons name={icon as any} size={12} color={color} />
+          <Text style={[s.verdictPillText, { color }]}>{VERDICT_TEXT[impact.verdict].short}</Text>
+        </View>
+      </View>
+
+      <Text style={s.summarySentence}>{impactSentence(impact, period)}</Text>
+
+      {impact.total > 0 && (
+        <>
+          <View style={s.summaryBarRow}>
+            <Text style={s.summaryBarEdge}>-100%</Text>
+            <NetBar net={impact.net} height={8} />
+            <Text style={s.summaryBarEdge}>+100%</Text>
+          </View>
+
+          <Text style={s.summaryCounts}>
+            {countsSentence(impact)} · {impact.total} {impact.total === 1 ? 'notícia analisada' : 'notícias analisadas'}
+          </Text>
+
+          {impact.best && impact.tickers.length > 1 && (
+            <View style={s.highlights}>
+              <View style={s.highlight}>
+                <Text style={s.highlightLabel}>Mais propício</Text>
+                <Text style={[s.highlightValue, { color: VERDICT_COLOR[impact.best.verdict] }]}>
+                  {impact.best.ticker} {signedPct(impact.best.net)}
+                </Text>
+              </View>
+              {impact.worst && (
+                <View style={s.highlight}>
+                  <Text style={s.highlightLabel}>Mais adverso</Text>
+                  <Text style={[s.highlightValue, { color: VERDICT_COLOR[impact.worst.verdict] }]}>
+                    {impact.worst.ticker} {signedPct(impact.worst.net)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          <View style={s.divider} />
+          {impact.tickers.map((t) => <TickerRow key={t.ticker} t={t} />)}
+        </>
+      )}
+    </GlassCard>
+  );
+}
+
+// ─── Cartão de análise ───────────────────────────────────────────────────────
+
+function AnalysisCard({ item, portfolioNames }: { item: Analysis; portfolioNames?: string[] }) {
   const sent = item.result?.sentiment_label;
   const sc   = sent ? SENT[sent] : null;
   const st   = STATUS[item.status] ?? { label: item.status, color: C.textMuted };
+  const impact = item.result?.impact_score ?? 0;
+  const positives = item.result?.positive_signals ?? [];
+  const negatives = item.result?.negative_signals ?? [];
+  const topics    = item.result?.detected_topics ?? [];
 
   return (
     <GlassCard style={s.card}>
@@ -59,6 +172,13 @@ function AnalysisCard({ item }: { item: Analysis }) {
         )}
       </View>
 
+      {portfolioNames && portfolioNames.length > 0 && (
+        <View style={s.walletRow}>
+          <Ionicons name="wallet-outline" size={12} color={C.textMuted} />
+          <Text style={s.walletText} numberOfLines={1}>{portfolioNames.join(' · ')}</Text>
+        </View>
+      )}
+
       <TouchableOpacity onPress={() => item.article_url && Linking.openURL(item.article_url)} accessibilityRole="link">
         <Text style={s.articleTitle} numberOfLines={2}>{item.article_title}</Text>
       </TouchableOpacity>
@@ -67,23 +187,23 @@ function AnalysisCard({ item }: { item: Analysis }) {
         <>
           <View style={s.impactRow}>
             <Text style={s.impactLabel}>Impacto</Text>
-            <ScoreBar score={item.result.impact_score} />
-            <Text style={s.impactValue}>{(item.result.impact_score * 100).toFixed(0)}%</Text>
+            <NetBar net={impact} />
+            <Text style={s.impactValue}>{signedPct(impact)}</Text>
           </View>
           <Text style={s.explanation} numberOfLines={3}>{item.result.explanation}</Text>
-          {(item.result.positive_signals.length > 0 || item.result.negative_signals.length > 0) && (
+          {(positives.length > 0 || negatives.length > 0) && (
             <View style={s.signals}>
-              {item.result.positive_signals.map((sg) => (
+              {positives.map((sg) => (
                 <View key={sg} style={s.sigPos}><Text style={s.sigPosText}>{sg.replace('word:', '')}</Text></View>
               ))}
-              {item.result.negative_signals.map((sg) => (
+              {negatives.map((sg) => (
                 <View key={sg} style={s.sigNeg}><Text style={s.sigNegText}>{sg.replace('word:', '')}</Text></View>
               ))}
             </View>
           )}
-          {item.result.detected_topics.length > 0 && (
+          {topics.length > 0 && (
             <View style={s.topics}>
-              {item.result.detected_topics.map((t) => (
+              {topics.map((t) => (
                 <View key={t} style={s.topic}><Text style={s.topicText}>{t}</Text></View>
               ))}
             </View>
@@ -100,30 +220,101 @@ function AnalysisCard({ item }: { item: Analysis }) {
   );
 }
 
+// ─── Tela ────────────────────────────────────────────────────────────────────
+
 export default function AnalysesScreen() {
   const qc = useQueryClient();
+  // null = "Todas as carteiras": é o estado inicial e mostra tudo, dizendo a origem.
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [timeFilter, setTimeFilter] = useState('1M');
+  const [period, setPeriod] = useState<PeriodKey>('1M');
 
   const { data: portfolios, isLoading: loadingP } = useQuery({ queryKey: ['portfolios'], queryFn: listPortfolios });
+  const list = portfolios ?? [];
+  const showingAll = selectedId === null;
 
-  const { data: analyses, isLoading, refetch, isRefetching } = useQuery({
+  const single = useQuery({
     queryKey: ['analyses', selectedId],
     queryFn: () => listAnalyses(selectedId!),
     enabled: selectedId !== null,
   });
 
-  const analyseMutation = useMutation({
-    mutationFn: () => analysePortfolio(selectedId!),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['analyses', selectedId] });
-      Alert.alert('Análise iniciada', `Tarefa ${data.task_id} enfileirada.\nAtualize em instantes.`);
-    },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+  const allQueries = useQueries({
+    queries: list.map((p) => ({
+      queryKey: ['analyses', p.id],
+      queryFn: () => listAnalyses(p.id),
+      enabled: showingAll,
+    })),
   });
 
-  const completed = (analyses ?? []).filter((a) => a.status === 'completed').length;
-  const total = (analyses ?? []).length;
+  const allStamp = allQueries.map((q) => q.dataUpdatedAt).join(',');
+
+  /** Sem carteira selecionada, junta as análises de todas e marca de qual carteira vêm. */
+  const rows: Row[] = useMemo(() => {
+    if (!showingAll) {
+      return (single.data ?? []).map((a) => ({ analysis: a, portfolioNames: [] }));
+    }
+    const merged = new Map<number, Row>();
+    allQueries.forEach((q, i) => {
+      const name = list[i]?.name ?? '';
+      for (const a of q.data ?? []) {
+        const existing = merged.get(a.id);
+        if (existing) {
+          if (name && !existing.portfolioNames.includes(name)) existing.portfolioNames.push(name);
+        } else {
+          merged.set(a.id, { analysis: a, portfolioNames: name ? [name] : [] });
+        }
+      }
+    });
+    return [...merged.values()].sort(
+      (x, y) => new Date(y.analysis.created_at).getTime() - new Date(x.analysis.created_at).getTime(),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showingAll, single.data, allStamp, list]);
+
+  /** Recorte do período escolhido nos chips (1S · 1M · 3M · 6M · 1A). */
+  const visible = useMemo(() => {
+    const kept = new Set(filterByPeriod(rows.map((r) => r.analysis), period).map((a) => a.id));
+    return rows.filter((r) => kept.has(r.analysis.id));
+  }, [rows, period]);
+
+  const impact = useMemo(() => buildPeriodImpact(visible.map((r) => r.analysis)), [visible]);
+
+  const analyseMutation = useMutation({
+    mutationFn: async () => {
+      const ids = showingAll ? list.map((p) => p.id) : [selectedId!];
+      const tasks: string[] = [];
+      for (const id of ids) {
+        const res = await analysePortfolio(id);
+        tasks.push(res.task_id);
+      }
+      return tasks;
+    },
+    onSuccess: (tasks) => {
+      qc.invalidateQueries({ queryKey: ['analyses'] });
+      notify(
+        'Análise iniciada',
+        tasks.length === 1
+          ? `Tarefa ${tasks[0]} enfileirada. Atualize em instantes.`
+          : `${tasks.length} carteiras enfileiradas. Atualize em instantes.`,
+      );
+    },
+    onError: (e: Error) => notify('Erro', e.message),
+  });
+
+  function refetchAll() {
+    if (showingAll) allQueries.forEach((q) => q.refetch());
+    else single.refetch();
+  }
+
+  const isLoading    = showingAll ? allQueries.some((q) => q.isLoading)    : single.isLoading;
+  const isRefetching = showingAll ? allQueries.some((q) => q.isRefetching) : single.isRefetching;
+
+  const completed = visible.filter((r) => r.analysis.status === 'completed').length;
+  const subtitle = list.length === 0
+    ? undefined
+    : showingAll
+      ? `Todas as carteiras · ${completed} de ${visible.length} concluídas`
+      : `${completed} de ${visible.length} concluídas`;
 
   if (loadingP) {
     return (
@@ -140,47 +331,73 @@ export default function AnalysesScreen() {
       <SafeAreaView style={s.page} edges={['top', 'left', 'right']}>
         <ScreenHeader
           title="Analytics"
-          subtitle={selectedId && total > 0 ? `${completed} de ${total} concluídas` : undefined}
+          subtitle={subtitle}
           right={
-            selectedId ? (
-              <GhostButton label="Analisar" icon="pulse" onPress={() => analyseMutation.mutate()} loading={analyseMutation.isPending} />
-            ) : undefined
+            <View style={s.headerActions}>
+              {list.length > 0 && (
+                <GhostButton
+                  label="Analisar"
+                  icon="pulse"
+                  onPress={() => analyseMutation.mutate()}
+                  loading={analyseMutation.isPending}
+                />
+              )}
+              <UserAvatar size={40} />
+            </View>
           }
         />
 
         {/* Período (Figma: 1S · 1M · 3M · 6M · 1A) */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll} contentContainerStyle={s.chipRow}>
-          {TIME_FILTERS.map((f) => (
-            <Chip key={f} label={f} active={timeFilter === f} onPress={() => setTimeFilter(f)} style={s.timeChip} />
+          {PERIODS.map((p) => (
+            <Chip key={p.key} label={p.key} active={period === p.key} onPress={() => setPeriod(p.key)} style={s.timeChip} />
           ))}
         </ScrollView>
 
-        {/* Portfólio */}
-        {(portfolios ?? []).length > 0 && (
+        {/* Carteira — "Todas" é o padrão */}
+        {list.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll} contentContainerStyle={s.chipRow}>
-            {(portfolios ?? []).map((p: PortfolioListItem) => (
+            <Chip label="Todas" icon="albums-outline" active={showingAll} onPress={() => setSelectedId(null)} />
+            {list.map((p: PortfolioListItem) => (
               <Chip key={p.id} label={p.name} icon="wallet-outline" active={selectedId === p.id} onPress={() => setSelectedId(p.id)} />
             ))}
           </ScrollView>
         )}
 
-        {!selectedId ? (
+        {list.length === 0 ? (
           <View style={s.centered}>
-            <EmptyState icon="pie-chart-outline" title="Escolha um portfólio" description="Selecione um portfólio para ver as análises de sentimento." />
+            <EmptyState
+              icon="wallet-outline"
+              title="Nenhuma carteira ainda"
+              description="Crie uma carteira na aba Carteira para ver as análises."
+            />
           </View>
         ) : isLoading ? (
           <View style={s.centered}><ActivityIndicator color={C.accentLt} size="large" /></View>
-        ) : !analyses?.length ? (
-          <View style={s.centered}>
-            <EmptyState icon="stats-chart-outline" title="Nenhuma análise ainda" description='Toque em "Analisar" para iniciar.' />
-          </View>
         ) : (
           <FlatList
-            data={analyses}
-            keyExtractor={(i) => String(i.id)}
+            data={visible}
+            keyExtractor={(r) => String(r.analysis.id)}
             contentContainerStyle={s.list}
-            renderItem={({ item }) => <AnalysisCard item={item} />}
-            refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={C.accentLt} colors={[C.accentLt]} />}
+            ListHeaderComponent={<ImpactSummary impact={impact} period={period} />}
+            ListEmptyComponent={
+              <View style={s.emptyList}>
+                <EmptyState
+                  icon="stats-chart-outline"
+                  title="Nenhuma análise no período"
+                  description={'Troque o período acima ou toque em "Analisar" para buscar notícias novas.'}
+                />
+              </View>
+            }
+            renderItem={({ item }) => (
+              <AnalysisCard
+                item={item.analysis}
+                portfolioNames={showingAll ? item.portfolioNames : undefined}
+              />
+            )}
+            refreshControl={
+              <RefreshControl refreshing={isRefetching} onRefresh={refetchAll} tintColor={C.accentLt} colors={[C.accentLt]} />
+            }
             showsVerticalScrollIndicator={false}
           />
         )}
@@ -191,14 +408,49 @@ export default function AnalysesScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  page: { flex: 1, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  page: { flex: 1, width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40, paddingBottom: TAB_BAR_SPACE / 2 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
-  chipScroll: { flexGrow: 0, marginBottom: 6 },
+  // flexShrink: 0 é obrigatório: o ScrollView do react-native-web nasce com
+  // flexShrink 1 e a lista abaixo esmagava a linha de chips até sumir.
+  chipScroll: { flexGrow: 0, flexShrink: 0, marginBottom: 6 },
   chipRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center', paddingVertical: 4 },
   timeChip: { paddingHorizontal: 18 },
 
   list: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: TAB_BAR_SPACE },
+  emptyList: { paddingVertical: 36 },
+
+  // Resumo de impacto
+  summary: { padding: 16, marginBottom: 14, gap: 10, borderRadius: R.xl },
+  summaryHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  summaryTitle: { color: C.text, fontSize: 15, fontWeight: '700', flex: 1 },
+  verdictPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: R.pill,
+    borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  verdictPillText: { fontSize: 11, fontWeight: '800' },
+  summarySentence: { color: C.textSec, fontSize: 13, lineHeight: 19 },
+  summaryBarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  summaryBarEdge: { color: C.textMuted, fontSize: 10 },
+  summaryCounts: { color: C.text, fontSize: 12, fontWeight: '600' },
+  highlights: { flexDirection: 'row', gap: 10, marginTop: 2 },
+  highlight: {
+    flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: R.md,
+    paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: C.border,
+  },
+  highlightLabel: { color: C.textMuted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+  highlightValue: { fontSize: 14, fontWeight: '700', marginTop: 2 },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: C.border, marginVertical: 4 },
+
+  tickerRow: { gap: 6, paddingVertical: 6 },
+  tickerRowHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tickerCounts: { color: C.textSec, fontSize: 11, flex: 1 },
+  tickerVerdict: { fontSize: 12, fontWeight: '700' },
+  tickerBarRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tickerVerdictWord: { fontSize: 10, fontWeight: '700', minWidth: 54, textAlign: 'right' },
+
+  // Cartão
   card: { padding: 14, marginBottom: 12, gap: 8 },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   tickerBadge: {
@@ -209,10 +461,12 @@ const s = StyleSheet.create({
   statusText: { fontSize: 11, fontWeight: '600' },
   sentBadge: { marginLeft: 'auto', borderRadius: R.pill, paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1 },
   sentText: { fontSize: 11, fontWeight: '700' },
+  walletRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  walletText: { color: C.textMuted, fontSize: 11, flex: 1 },
   articleTitle: { color: C.text, fontSize: 14, fontWeight: '600', lineHeight: 20 },
   impactRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   impactLabel: { color: C.textMuted, fontSize: 11 },
-  impactValue: { color: C.textSec, fontSize: 11, fontWeight: '600', minWidth: 28, textAlign: 'right' },
+  impactValue: { color: C.textSec, fontSize: 11, fontWeight: '600', minWidth: 36, textAlign: 'right' },
   explanation: { color: C.textSec, fontSize: 12, lineHeight: 18 },
   signals: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   sigPos: { backgroundColor: C.successSoft, borderRadius: R.pill, paddingHorizontal: 8, paddingVertical: 2 },

@@ -1,77 +1,37 @@
-import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
-import Constants from 'expo-constants';
+import { useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { getNotificationsEnabled } from '../services/notificationPrefs';
+import { IS_NATIVE_PUSH, enablePush, getCurrentToken, unregisterCurrentToken } from '../services/push';
 
-// expo-notifications não funciona no Expo Go desde SDK 53
-// Só ativa em development build ou produção
-const IS_EXPO_GO = Constants.appOwnership === 'expo';
-
+/**
+ * Registra o aparelho para push ao entrar, desde que o usuário não tenha
+ * desligado as notificações na tela de Perfil › Notificações.
+ *
+ * A lógica de permissão/registro mora em `services/push.ts`, compartilhada com
+ * aquela tela. Expo Go e web não registram token (ver o serviço).
+ */
 export function useNotificationSetup() {
-  const { isAuthenticated } = useAuthStore();
-  const tokenRef = useRef<string | null>(null);
+  const isAuthenticated = useAuthStore((st) => st.isAuthenticated);
 
   useEffect(() => {
-    if (!isAuthenticated || IS_EXPO_GO) return;
+    if (!isAuthenticated || !IS_NATIVE_PUSH) return;
 
-    async function setup() {
-      try {
-        const Notifications = await import('expo-notifications');
-        const Device = await import('expo-device');
-        const { registerDeviceToken, unregisterDeviceToken } = await import('../services/notifications');
+    let cancelled = false;
+    (async () => {
+      const wanted = await getNotificationsEnabled();
+      if (cancelled || !wanted) return;
+      const res = await enablePush();
+      if (!res.ok) console.warn('Notificações não disponíveis:', res.message);
+    })();
 
-        Notifications.setNotificationHandler({
-          handleNotification: async () => ({
-            shouldShowAlert: true,
-            shouldShowBanner: true,
-            shouldShowList: true,
-            shouldPlaySound: true,
-            shouldSetBadge: true,
-          }),
-        });
-
-        if (!Device.default.isDevice) return;
-
-        if (Platform.OS === 'android') {
-          await Notifications.setNotificationChannelAsync('news', {
-            name: 'Notícias do portfólio',
-            importance: Notifications.AndroidImportance.HIGH,
-            vibrationPattern: [0, 250, 250, 250],
-            lightColor: '#818CF8',
-            sound: 'default',
-          });
-        }
-
-        const { status: existing } = await Notifications.getPermissionsAsync();
-        let finalStatus = existing;
-        if (existing !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
-        if (finalStatus !== 'granted') return;
-
-        const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-        const tokenData = await Notifications.getExpoPushTokenAsync(
-          projectId ? { projectId } : undefined,
-        );
-        tokenRef.current = tokenData.data;
-
-        const platform: 'android' | 'ios' = Platform.OS === 'ios' ? 'ios' : 'android';
-        await registerDeviceToken(tokenRef.current, platform);
-      } catch (err) {
-        console.warn('Notificações não disponíveis:', err);
-      }
-    }
-
-    setup();
+    return () => { cancelled = true; };
   }, [isAuthenticated]);
 
+  // Ao sair da conta, o token deste aparelho não deve continuar no backend.
   useEffect(() => {
-    if (!isAuthenticated && tokenRef.current && !IS_EXPO_GO) {
-      import('../services/notifications').then(({ unregisterDeviceToken }) => {
-        unregisterDeviceToken(tokenRef.current!).catch(() => {});
-        tokenRef.current = null;
-      });
+    if (!isAuthenticated && IS_NATIVE_PUSH && getCurrentToken()) {
+      // Só tira o token daqui — a preferência do usuário continua valendo.
+      unregisterCurrentToken().catch(() => {});
     }
   }, [isAuthenticated]);
 }
