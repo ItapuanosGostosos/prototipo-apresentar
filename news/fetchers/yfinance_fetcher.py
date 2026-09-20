@@ -26,7 +26,16 @@ class YFinanceFetcher(BaseNewsFetcher):
             return ticker + '.SA'
         return ticker
 
-    def fetch(self, tickers: list[str]) -> list[FetchedArticle]:
+    def fetch(
+        self,
+        tickers: list[str],
+        asset_types: dict[str, str] | None = None,
+    ) -> list[FetchedArticle]:
+        # ``asset_types`` e aceito para manter a interface igual a do
+        # BaseNewsFetcher, mas nao muda nada aqui: o _yf_symbol ja acerta o
+        # sufixo .SA pelos digitos finais do ticker, e para cripto o Yahoo
+        # devolve a mesma feed generica em qualquer forma do simbolo
+        # (BTC, BTC-USD e ETH-USD trazem as mesmas materias).
         articles = []
         seen_urls = set()
 

@@ -222,6 +222,25 @@ function AnalysisCard({ item, portfolioNames }: { item: Analysis; portfolioNames
 
 // ─── Tela ────────────────────────────────────────────────────────────────────
 
+/** De quanto em quanto tempo a tela se atualiza sozinha enquanto há fila. */
+const POLL_MS = 4000;
+
+const EM_ANDAMENTO: Analysis['status'][] = ['pending', 'processing'];
+
+function temPendente(lista?: Analysis[]): boolean {
+  return (lista ?? []).some((a) => EM_ANDAMENTO.includes(a.status));
+}
+
+/**
+ * A análise é assíncrona: a API responde na hora e o worker vai concluindo as
+ * linhas depois. Sem isto a tela ficava congelada no estado anterior até o
+ * usuário puxar para atualizar. Enquanto houver análise na fila busca sozinha;
+ * quando a última conclui, para de buscar.
+ */
+function pollEnquantoPendente(query: { state: { data?: Analysis[] } }): number | false {
+  return temPendente(query.state.data) ? POLL_MS : false;
+}
+
 export default function AnalysesScreen() {
   const qc = useQueryClient();
   // null = "Todas as carteiras": é o estado inicial e mostra tudo, dizendo a origem.
@@ -236,6 +255,7 @@ export default function AnalysesScreen() {
     queryKey: ['analyses', selectedId],
     queryFn: () => listAnalyses(selectedId!),
     enabled: selectedId !== null,
+    refetchInterval: pollEnquantoPendente,
   });
 
   const allQueries = useQueries({
@@ -243,6 +263,7 @@ export default function AnalysesScreen() {
       queryKey: ['analyses', p.id],
       queryFn: () => listAnalyses(p.id),
       enabled: showingAll,
+      refetchInterval: pollEnquantoPendente,
     })),
   });
 
@@ -294,8 +315,8 @@ export default function AnalysesScreen() {
       notify(
         'Análise iniciada',
         tasks.length === 1
-          ? `Tarefa ${tasks[0]} enfileirada. Atualize em instantes.`
-          : `${tasks.length} carteiras enfileiradas. Atualize em instantes.`,
+          ? 'As notícias estão sendo analisadas. O progresso aparece aqui mesmo.'
+          : `${tasks.length} carteiras enfileiradas. O progresso aparece aqui mesmo.`,
       );
     },
     onError: (e: Error) => notify('Erro', e.message),
@@ -310,11 +331,17 @@ export default function AnalysesScreen() {
   const isRefetching = showingAll ? allQueries.some((q) => q.isRefetching) : single.isRefetching;
 
   const completed = visible.filter((r) => r.analysis.status === 'completed').length;
+  const naFila = visible.length - completed;
+  // Com fila em andamento a tela se atualiza sozinha; dizer isso evita que o
+  // usuário ache que travou e fique puxando para atualizar.
+  const progresso = naFila > 0
+    ? `${completed} de ${visible.length} concluídas · analisando ${naFila}…`
+    : `${completed} de ${visible.length} concluídas`;
   const subtitle = list.length === 0
     ? undefined
     : showingAll
-      ? `Todas as carteiras · ${completed} de ${visible.length} concluídas`
-      : `${completed} de ${visible.length} concluídas`;
+      ? `Todas as carteiras · ${progresso}`
+      : progresso;
 
   if (loadingP) {
     return (

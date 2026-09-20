@@ -1,0 +1,134 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="MErESe59RdOGItrSucNs">
+    <mxGraphModel dx="4198" dy="1317" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-3" edge="1" parent="1" source="Z0RW3dffUJlpLu8tIbBc-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="Z0RW3dffUJlpLu8tIbBc-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="FRONT - APP&lt;br&gt;REACT NATIVE" vertex="1">
+          <mxGeometry height="60" width="120" x="362.5" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-5" edge="1" parent="1" source="Z0RW3dffUJlpLu8tIbBc-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="Z0RW3dffUJlpLu8tIbBc-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="KeyCloak" vertex="1">
+          <mxGeometry height="70" width="270" x="560" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-21" edge="1" parent="1" source="Z0RW3dffUJlpLu8tIbBc-4" target="Z0RW3dffUJlpLu8tIbBc-8" value="consulta e grava" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-13" edge="1" parent="1" source="Z0RW3dffUJlpLu8tIbBc-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="Z0RW3dffUJlpLu8tIbBc-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-8" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" value="DB ORACLE" vertex="1">
+          <mxGeometry height="80" width="60" x="-160" y="960" as="geometry" />
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-10" parent="1" style="ellipse;whiteSpace=wrap;html=1;" value="USER" vertex="1">
+          <mxGeometry height="80" width="120" x="-420" y="960" as="geometry" />
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-11" parent="1" style="ellipse;whiteSpace=wrap;html=1;" value="WALLET" vertex="1">
+          <mxGeometry height="80" width="120" x="-420" y="1280" as="geometry" />
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-14" edge="1" parent="1" source="Z0RW3dffUJlpLu8tIbBc-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="Z0RW3dffUJlpLu8tIbBc-11">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="-80" y="1270" />
+              <mxPoint x="-360" y="1270" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-19" edge="1" parent="1" source="Z0RW3dffUJlpLu8tIbBc-11" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" target="Z0RW3dffUJlpLu8tIbBc-10" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="160" y="1000" as="sourcePoint" />
+            <mxPoint x="210" y="950" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-20" connectable="0" parent="Z0RW3dffUJlpLu8tIbBc-19" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="1 USER PODE TER VARIAS CARTEIRAS MAS&lt;div&gt;&amp;nbsp;TODA CARTEIRA DEVE SER LIGADA A PELO MENOS UM USER&lt;/div&gt;" vertex="1">
+          <mxGeometry relative="1" x="0.0146" as="geometry">
+            <mxPoint x="-139" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-4" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="verifica se o usuário esta presente no banco e cadastra novos usuários" vertex="1">
+          <mxGeometry height="80" width="180" x="-265" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-5" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Camada da aplicação onde funcionara como segurança e roteador de acessos da aplicação" vertex="1">
+          <mxGeometry height="30" width="180" x="845" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-6" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Banco de dados central do produto, nele deveremos ter os cadastros de usuarios e de carteiras separados, não será necessario o armazenamento de ativos individualmente pois a aplicação fará a busca das noticias do ativo." vertex="1">
+          <mxGeometry height="30" width="220" x="-60" y="1000" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-8" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Camada de acesso ao usuário final onde deverá apresentar por meio de uma interface gráfica todas funcionalidades de uso.&lt;br&gt;Rodará por meio de um APK baixado no dispositivo localmente." vertex="1">
+          <mxGeometry height="30" width="190" x="130" y="295" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-9" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Tabela onde deverá conter o nome da carteira, Id da carteira, Json contendo os ativos e Id do usuario dono da carteira" vertex="1">
+          <mxGeometry height="80" width="210" x="-280" y="1280" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-10" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Cadastro do investidor em questão, contendo nome, CPF, email e senha" vertex="1">
+          <mxGeometry height="70" width="220" x="-640" y="980" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-13" parent="1" style="swimlane;whiteSpace=wrap;html=1;" value="Banco de dados na nuvem FIAP RM551157" vertex="1">
+          <mxGeometry height="580" width="940" x="-680" y="870" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-35" parent="VZUymnYtFafkCwwtPIZD-13" style="ellipse;whiteSpace=wrap;html=1;" value="ANALISES" vertex="1">
+          <mxGeometry height="80" width="120" x="680" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-36" parent="VZUymnYtFafkCwwtPIZD-13" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Toda análise de sentimento é gravada no banco com ID, ticker, status, idioma, motor (engine), nota de sentimento, relevância, relatório em português e o JSON completo da análise." vertex="1">
+          <mxGeometry height="70" width="140" x="670" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-17" parent="1" style="swimlane;whiteSpace=wrap;html=1;" value="AWS" vertex="1">
+          <mxGeometry height="990" width="710" x="530" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-34" edge="1" parent="1" source="8Q1NDgMDF9Obbsjo35JJ-16" target="VZUymnYtFafkCwwtPIZD-35" value="grava o resultado" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-17" parent="VZUymnYtFafkCwwtPIZD-17" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="MOTOR SENTIMENTO pt-BR" vertex="1">
+          <mxGeometry height="80" width="80" x="340" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="8Q1NDgMDF9Obbsjo35JJ-19" edge="1" parent="VZUymnYtFafkCwwtPIZD-17" source="VZUymnYtFafkCwwtPIZD-27" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="8Q1NDgMDF9Obbsjo35JJ-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-27" parent="VZUymnYtFafkCwwtPIZD-17" style="rounded=0;whiteSpace=wrap;html=1;" value="RABBITMQ" vertex="1">
+          <mxGeometry height="60" width="120" x="320" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-32" parent="VZUymnYtFafkCwwtPIZD-17" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="A API GRAVA A ANÁLISE COMO PENDENTE E PUBLICA O ID NA FILA.&lt;br&gt;A FILA SÓ TRANSPORTA A MENSAGEM &amp;#8212; QUEM PROCESSA É O WORKER, QUE CONSOME O ID." vertex="1">
+          <mxGeometry height="30" width="155" x="470" y="525" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-33" parent="VZUymnYtFafkCwwtPIZD-17" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="APOS A ANALISE, O WORKER GRAVA O RESULTADO NA TABELA ANALISES.&lt;br&gt;A API PASSA A DEVOLVE-LO AO APP NA CONSULTA SEGUINTE." vertex="1">
+          <mxGeometry height="90" width="160" x="30" y="660" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-28" edge="1" parent="VZUymnYtFafkCwwtPIZD-17" source="Z0RW3dffUJlpLu8tIbBc-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="VZUymnYtFafkCwwtPIZD-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="8Q1NDgMDF9Obbsjo35JJ-1" parent="VZUymnYtFafkCwwtPIZD-17" style="swimlane;whiteSpace=wrap;html=1;" value="EC2" vertex="1">
+          <mxGeometry height="430" width="520" x="10" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-4" parent="8Q1NDgMDF9Obbsjo35JJ-1" style="rounded=0;whiteSpace=wrap;html=1;" value="API TRACKER&amp;nbsp;&lt;br&gt;DJANGO PYTHON" vertex="1">
+          <mxGeometry height="60" width="120" x="95" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-1" parent="8Q1NDgMDF9Obbsjo35JJ-1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Core do produto, Api que deverá operar todo o sistema de noticias, gerenciamento de carteiras e pesquisas sobre ativos, antes de enviar uma carteira no banco deverá verificar se o ativo é valido, para isso a api deverá realizar uma consulta e verificar se ela tem noticias presentes, caso haja poderá ser cadastrado no banco" vertex="1">
+          <mxGeometry height="30" width="200" x="55" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="8Q1NDgMDF9Obbsjo35JJ-16" parent="VZUymnYtFafkCwwtPIZD-17" style="swimlane;whiteSpace=wrap;html=1;" value="EC2" vertex="1">
+          <mxGeometry height="280" width="350" x="275" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-7" parent="8Q1NDgMDF9Obbsjo35JJ-16" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Motor de análise de sentimento &lt;b&gt;baseado em regras&lt;/b&gt;, não treinado.&lt;br&gt;Léxico e regras próprios no pt-BR; VADER no inglês.&lt;br&gt;Avalia se a notícia é positiva, neutra ou negativa para o ativo." vertex="1">
+          <mxGeometry height="105" width="215" x="68" y="168" as="geometry" />
+        </mxCell>
+        <mxCell id="Z0RW3dffUJlpLu8tIbBc-18" parent="8Q1NDgMDF9Obbsjo35JJ-16" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="MOTOR SENTIMENTO EN" vertex="1">
+          <mxGeometry height="80" width="80" x="195" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-22" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Realizará o cadastro de carteiras e request de analises pendentes" vertex="1">
+          <mxGeometry height="60" width="140" x="30" y="630" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-26" edge="1" parent="1" source="VZUymnYtFafkCwwtPIZD-24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="Z0RW3dffUJlpLu8tIbBc-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-24" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" value="Investidor" vertex="1">
+          <mxGeometry height="130" width="75" x="385" y="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

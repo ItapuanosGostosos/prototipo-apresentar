@@ -23,6 +23,15 @@ class BaseNewsFetcher(ABC):
     source_slug: str = ''
 
     @abstractmethod
-    def fetch(self, tickers: list[str]) -> list[FetchedArticle]:
-        """Fetch news articles for the given list of tickers."""
+    def fetch(
+        self,
+        tickers: list[str],
+        asset_types: dict[str, str] | None = None,
+    ) -> list[FetchedArticle]:
+        """Fetch news articles for the given list of tickers.
+
+        ``asset_types`` mapeia ticker -> ``Asset.AssetType`` (stock, fii,
+        crypto, etf, bdr). E opcional de proposito: so quem tem a carteira em
+        maos consegue preencher. Sem ele o fetcher volta a deduzir pelo ticker.
+        """
         ...

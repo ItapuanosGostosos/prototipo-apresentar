@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'news',
     'notifications',
     'sentiment_ai.apps.SentimentAIConfig',
+    'feedback',
     'drf_spectacular',
 ]
 
@@ -153,3 +154,57 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 FIREBASE_CREDENTIALS_PATH = env('FIREBASE_CREDENTIALS_PATH', default='firebase-credentials.json')
+
+
+# =============================================================================
+# Analise de sentimento (sentiment_ai)
+# =============================================================================
+SENTIMENT_QUEUE = env('SENTIMENT_QUEUE', default='sentiment_analysis')
+
+# Idioma usado quando a fonte nao informa, o banco nao tem e a deteccao nao
+# conclui. NAO e ingles de proposito: a base de ativos e brasileira.
+SENTIMENT_FALLBACK_LANGUAGE = env('SENTIMENT_FALLBACK_LANGUAGE', default='pt-BR')
+
+# Idioma declarado por fonte. Vence a deteccao automatica.
+SENTIMENT_SOURCE_LANGUAGES = {
+    'google_news': 'pt-BR',
+}
+
+# Fontes consultadas pela analise sob demanda (POST /portfolios/{id}/analyse).
+SENTIMENT_ANALYSIS_SOURCES = (
+    ('yfinance', 'Yahoo Finance'),
+    ('google_news', 'Google News'),
+)
+
+# =============================================================================
+# LLM externa — opcional e desligada por padrao
+# =============================================================================
+# Nenhum valor real mora aqui. Tudo vem do ambiente; o .env.example lista
+# somente os NOMES das variaveis.
+LLM_ENABLED = env.bool('LLM_ENABLED', default=False)
+LLM_PROVIDER = env('LLM_PROVIDER', default='')          # anthropic | openai | gemini
+LLM_MODEL = env('LLM_MODEL', default='')
+LLM_API_KEY = env('LLM_API_KEY', default='')
+LLM_BASE_URL = env('LLM_BASE_URL', default='')
+LLM_TIMEOUT_SECONDS = env.int('LLM_TIMEOUT_SECONDS', default=20)
+LLM_MAX_RETRIES = env.int('LLM_MAX_RETRIES', default=2)
+LLM_LANGUAGES = tuple(env.list('LLM_LANGUAGES', default=['pt-BR']))
+
+# =============================================================================
+# Logging estruturado
+# =============================================================================
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'plain': {'format': '%(asctime)s %(levelname)s %(name)s %(message)s'},
+    },
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'plain'},
+    },
+    'root': {'handlers': ['console'], 'level': 'INFO'},
+    'loggers': {
+        'sentiment_ai': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'sentiment_ai.events': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+    },
+}

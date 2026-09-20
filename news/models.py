@@ -2,7 +2,13 @@ from django.db import models
 
 
 class Analysis(models.Model):
-    """Sentiment-analysis request and result for one article and ticker."""
+    """Sentiment-analysis request and result for one article and ticker.
+
+    A identidade logica de uma analise e (article, ticker, model_version).
+    Essa tripla tem UniqueConstraint: a deduplicacao e garantida pelo banco,
+    nao apenas pela aplicacao, para que duas requisicoes simultaneas nao criem
+    dois registros.
+    """
 
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pendente'
@@ -22,9 +28,30 @@ class Analysis(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # --- Campos aditivos: idioma, relatorio e deduplicacao -------------------
+    # Todos aceitam nulo/vazio para nao quebrar as linhas ja gravadas.
+    language = models.CharField(max_length=20, blank=True, default='', db_index=True)
+    engine = models.CharField(max_length=60, blank=True, default='')
+    sentiment_label = models.CharField(max_length=20, blank=True, default='', db_index=True)
+    sentiment_score = models.FloatField(null=True, blank=True)
+    relevance_score = models.FloatField(null=True, blank=True)
+    report = models.TextField(blank=True, default='')
+    news_fingerprint = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    llm_used = models.BooleanField(default=False)
+    fallback_reason = models.CharField(max_length=60, blank=True, default='')
+    queued_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         db_table = 'analises'
         ordering = ['created_at', 'id']
+        constraints = [
+            # Nome curto de proposito: Oracle 11g/12.1 limita identificadores
+            # a 30 caracteres.
+            models.UniqueConstraint(
+                fields=['article', 'ticker', 'model_version'],
+                name='uq_analise_art_tic_ver',
+            ),
+        ]
 
     def __str__(self):
         return f'Analysis #{self.pk} ({self.ticker or "sem ticker"}) - {self.status}'
@@ -47,8 +74,8 @@ class NewsArticle(models.Model):
     source = models.ForeignKey(NewsSource, on_delete=models.SET_NULL, null=True, related_name='articles')
     title = models.CharField(max_length=500)
     summary = models.TextField(blank=True)
-    url = models.URLField(max_length=500, unique=True)
-    thumbnail_url = models.URLField(max_length=500, blank=True)
+    url = models.URLField(max_length=1000, unique=True)
+    thumbnail_url = models.URLField(max_length=1000, blank=True)
     published_at = models.DateTimeField()
     tickers = models.ManyToManyField('portfolios.Asset', related_name='news', blank=True)
     fetched_at = models.DateTimeField(auto_now_add=True)
