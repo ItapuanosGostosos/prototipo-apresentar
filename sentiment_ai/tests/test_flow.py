@@ -331,3 +331,97 @@ class PortfolioAnalysisPipelineTests(TransactionTestCase):
 
         self.assertEqual(resultado["articles_queued"], 1)
         self.assertEqual(Analysis.objects.count(), 1)
+
+
+class FiiPortugueseNewsTests(TransactionTestCase):
+    """Regressao do caso relatado no teste do app: FII com notícia só em pt-BR.
+
+    Sintoma na `main`: a aba de notícias mostrava matéria em português para um
+    FII (porque `news/controller.py::_fetch_live` já chamava o GoogleNewsFetcher
+    para FII), mas `POST /analyse` devolvia lista vazia — a task de análise só
+    consultava o Yahoo Finance, e `MXRF11.SA` não tem notícia lá.
+
+    Este teste usa o GoogleNewsFetcher real, incluindo o parsing do RSS, com a
+    chamada HTTP substituída por um XML no formato que o Google devolve de fato:
+    `description` em HTML, link com parâmetro de rastreamento e `pubDate` RFC822.
+    """
+
+    reset_sequences = True
+
+    RSS = b"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>MXRF11</title>
+<item>
+<title>MXRF11 anuncia dividendo de R$ 0,12 por cota e mantem distribuicao mensal - InfoMoney</title>
+<link>https://news.google.com/rss/articles/CBMiK2h0dHBz?oc=5&amp;hl=pt-BR</link>
+<pubDate>Fri, 19 Sep 2026 12:00:00 GMT</pubDate>
+<description>&lt;a href="https://news.google.com/rss/articles/CBMiK2h0dHBz?oc=5"&gt;MXRF11&lt;/a&gt;&amp;nbsp;&lt;font color="#6f6f6f"&gt;InfoMoney&lt;/font&gt;</description>
+</item>
+<item>
+<title>Maxi Renda (MXRF11) registra queda no resultado e cota recua na B3 - Seu Dinheiro</title>
+<link>https://news.google.com/rss/articles/CBMiQWh0dHB?oc=5</link>
+<pubDate>Thu, 18 Sep 2026 09:30:00 GMT</pubDate>
+<description>&lt;a href="https://news.google.com/rss/articles/CBMiQWh0dHB?oc=5"&gt;Maxi Renda&lt;/a&gt;&amp;nbsp;&lt;font color="#6f6f6f"&gt;Seu Dinheiro&lt;/font&gt;</description>
+</item>
+</channel></rss>"""
+
+    class _FakeResponse:
+        status_code = 200
+
+        def __init__(self, content):
+            self.content = content
+
+        def raise_for_status(self):
+            return None
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            email="fii@example.com", username="fii", password="x"
+        )
+        self.portfolio = Portfolio.objects.create(user=self.user, name="FIIs")
+        Asset.objects.create(
+            portfolio=self.portfolio, ticker="MXRF11", name="Maxi Renda",
+            asset_type=Asset.AssetType.FII,
+        )
+
+    def _run(self):
+        from news.fetchers.yfinance_fetcher import YFinanceFetcher
+        from portfolios.tasks import analyse_portfolio
+
+        resposta = self._FakeResponse(self.RSS)
+        # O Yahoo Finance nao tem noticia para MXRF11.SA: devolve vazio, que e
+        # exatamente o cenario do bug.
+        with patch("news.fetchers.google_news_fetcher.requests.get", return_value=resposta), \
+             patch.object(YFinanceFetcher, "fetch", return_value=[]), \
+             patch(PUBLISH_TARGET):
+            return analyse_portfolio.apply(
+                args=(self.portfolio.pk, ["MXRF11"]), throw=True
+            ).get()
+
+    def test_fii_com_noticia_so_em_portugues_gera_analises(self):
+        resultado = self._run()
+
+        self.assertEqual(resultado["articles_queued"], 2)
+        self.assertEqual(NewsArticle.objects.count(), 2)
+        self.assertEqual(Analysis.objects.count(), 2)
+        self.assertEqual(
+            set(Analysis.objects.values_list("language", flat=True)), {PT_BR}
+        )
+
+    def test_analises_do_fii_concluem_com_rotulo_e_relatorio(self):
+        self._run()
+        for analysis in Analysis.objects.all():
+            process_analysis.apply(args=(analysis.pk,), throw=True)
+
+        analises = list(Analysis.objects.order_by("id"))
+        for analysis in analises:
+            analysis.refresh_from_db()
+            self.assertEqual(analysis.status, Analysis.Status.COMPLETED)
+            self.assertEqual(analysis.engine, "rules-ptbr")
+            self.assertIn("MXRF11", analysis.report)
+            # Relevante: o ticker aparece no titulo, entao nunca pode dar
+            # 'irrelevant' e sumir da tela.
+            self.assertNotEqual(analysis.sentiment_label, "irrelevant")
+
+        rotulos = {a.sentiment_label for a in analises}
+        self.assertIn("positive", rotulos)   # noticia de dividendo
+        self.assertIn("negative", rotulos)   # noticia de queda
