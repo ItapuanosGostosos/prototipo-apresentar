@@ -254,7 +254,7 @@ class PortfolioAnalysisPipelineTests(TransactionTestCase):
             def __init__(self, artigos):
                 self._artigos = artigos
 
-            def fetch(self, tickers):
+            def fetch(self, tickers, asset_types=None):
                 return self._artigos
 
         ingles = FakeFetcher([FetchedArticle(
@@ -306,11 +306,11 @@ class PortfolioAnalysisPipelineTests(TransactionTestCase):
         from portfolios.tasks import analyse_portfolio
 
         class Quebrada:
-            def fetch(self, tickers):
+            def fetch(self, tickers, asset_types=None):
                 raise RuntimeError("fonte fora do ar")
 
         class Boa:
-            def fetch(self, tickers):
+            def fetch(self, tickers, asset_types=None):
                 return [FetchedArticle(
                     title="Petrobras anuncia lucro recorde",
                     url="https://google.com/pt/2",

@@ -55,6 +55,14 @@ def analyse_portfolio(self, portfolio_id: int, tickers: list[str]):
     """Fetch portfolio news and enqueue sentiment analysis outside the HTTP request."""
     try:
         tickers_set = {ticker.upper() for ticker in tickers}
+
+        # O tipo do ativo ja esta no banco (Asset.asset_type). Sem passa-lo, o
+        # fetcher deduz pelo sufixo do ticker e erra em ETF -- BOVA11, IVVB11 e
+        # SMAL11 terminam em 11 como os FIIs.
+        asset_types = dict(
+            Asset.objects.filter(portfolio_id=portfolio_id, ticker__in=tickers_set)
+            .values_list('ticker', 'asset_type')
+        )
         articles_queued = 0
         articles_skipped = 0
         seen_urls: set[str] = set()
@@ -66,7 +74,7 @@ def analyse_portfolio(self, portfolio_id: int, tickers: list[str]):
             )
 
             try:
-                fetched = fetcher.fetch(tickers)
+                fetched = fetcher.fetch(tickers, asset_types=asset_types)
             except Exception as exc:
                 # Uma fonte fora do ar nao pode derrubar a analise inteira.
                 logger.error('Fonte %s falhou na analise da carteira %s: %s', slug, portfolio_id, exc)

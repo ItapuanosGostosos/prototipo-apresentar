@@ -18,12 +18,16 @@ class GoogleNewsFetcher(BaseNewsFetcher):
     _BASE_URL = 'https://news.google.com/rss/search'
     _HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; portfolio-tracker/1.0)'}
 
-    def fetch(self, tickers: list[str]) -> list[FetchedArticle]:
+    def fetch(
+        self,
+        tickers: list[str],
+        asset_types: dict[str, str] | None = None,
+    ) -> list[FetchedArticle]:
         articles = []
         seen_urls: set[str] = set()
 
         for ticker in tickers:
-            query = f'{ticker} fundo imobiliário' if self._is_fii(ticker) else ticker
+            query = self._query(ticker, (asset_types or {}).get(ticker))
             url = f"{self._BASE_URL}?q={quote(query)}&hl=pt-BR&gl=BR&ceid=BR:pt-BR"
 
             try:
@@ -61,6 +65,30 @@ class GoogleNewsFetcher(BaseNewsFetcher):
 
         return articles
 
+    def _query(self, ticker: str, asset_type: str | None) -> str:
+        """Termo pesquisado no Google News para um ticker.
+
+        Com o tipo em maos usamos o tipo. Sem ele caimos no palpite pelo
+        sufixo, que erra em ETF: BOVA11, IVVB11 e SMAL11 terminam em 11 como
+        os FIIs, e acabavam pesquisados como "fundo imobiliario".
+        """
+        termo = (
+            self._TERMO_POR_TIPO.get(asset_type)
+            if asset_type
+            else ('fundo imobiliário' if self._is_fii(ticker) else '')
+        )
+        return f'{ticker} {termo}'.strip() if termo else ticker
+
+    # Termo que acompanha o ticker na busca, por tipo de ativo.
+    _TERMO_POR_TIPO = {
+        'fii': 'fundo imobiliário',
+        'etf': 'ETF',
+        'crypto': 'criptomoeda',
+        'bdr': 'BDR',
+        'stock': '',
+    }
+
     @staticmethod
     def _is_fii(ticker: str) -> bool:
+        """Palpite usado so quando o tipo do ativo nao foi informado."""
         return len(ticker) >= 5 and (ticker.endswith('11') or ticker.endswith('12'))
