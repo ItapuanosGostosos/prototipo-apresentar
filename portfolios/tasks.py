@@ -4,6 +4,7 @@ from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
 
 from django.conf import settings
+from django.db import transaction
 
 from news.fetchers.google_news_fetcher import GoogleNewsFetcher
 from news.fetchers.yfinance_fetcher import YFinanceFetcher
@@ -55,6 +56,7 @@ def analyse_portfolio(self, portfolio_id: int, tickers: list[str]):
     try:
         tickers_set = {ticker.upper() for ticker in tickers}
         articles_queued = 0
+        articles_skipped = 0
         seen_urls: set[str] = set()
 
         for slug, name, fetcher in _analysis_sources():
@@ -75,22 +77,35 @@ def analyse_portfolio(self, portfolio_id: int, tickers: list[str]):
                     continue
                 seen_urls.add(article.url)
 
-                obj, _ = NewsArticle.objects.get_or_create(
-                    url=article.url,
-                    defaults={
-                        'source': source,
-                        'title': article.title,
-                        'summary': article.summary or '',
-                        'thumbnail_url': article.thumbnail_url or '',
-                        'published_at': article.published_at,
-                    },
-                )
-                related_assets = Asset.objects.filter(
-                    portfolio_id=portfolio_id,
-                    ticker__in=article.related_tickers,
-                )
-                if related_assets.exists():
-                    obj.tickers.add(*related_assets)
+                # Um artigo problematico nao pode derrubar a carteira inteira.
+                # Era o que acontecia: uma URL do Google News acima do limite da
+                # coluna estourava ORA-12899 e abortava a task, entao os tickers
+                # seguintes da carteira nunca chegavam a ser analisados.
+                try:
+                    with transaction.atomic():
+                        obj, _ = NewsArticle.objects.get_or_create(
+                            url=article.url,
+                            defaults={
+                                'source': source,
+                                'title': article.title,
+                                'summary': article.summary or '',
+                                'thumbnail_url': article.thumbnail_url or '',
+                                'published_at': article.published_at,
+                            },
+                        )
+                        related_assets = Asset.objects.filter(
+                            portfolio_id=portfolio_id,
+                            ticker__in=article.related_tickers,
+                        )
+                        if related_assets.exists():
+                            obj.tickers.add(*related_assets)
+                except Exception as exc:
+                    articles_skipped += 1
+                    logger.warning(
+                        'Artigo ignorado na carteira %s (%s...): %s',
+                        portfolio_id, article.url[:70], exc,
+                    )
+                    continue
 
                 for ticker in {t.upper() for t in article.related_tickers}:
                     if ticker in tickers_set:
@@ -98,11 +113,16 @@ def analyse_portfolio(self, portfolio_id: int, tickers: list[str]):
                         articles_queued += 1
 
         logger.info(
-            'Portfolio analysis %s queued %s article analyses.',
+            'Portfolio analysis %s queued %s article analyses (%s artigos ignorados).',
             portfolio_id,
             articles_queued,
+            articles_skipped,
         )
-        return {'portfolio_id': portfolio_id, 'articles_queued': articles_queued}
+        return {
+            'portfolio_id': portfolio_id,
+            'articles_queued': articles_queued,
+            'articles_skipped': articles_skipped,
+        }
     except SoftTimeLimitExceeded as exc:
         logger.error('Portfolio analysis %s exceeded its soft time limit.', portfolio_id)
         raise self.retry(exc=exc)
