@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { C, R, shadow } from '../../theme';
 
 export type IconName = keyof typeof Ionicons.glyphMap;
@@ -195,6 +196,25 @@ export function ScreenHeader({ title, subtitle, right }: { title: string; subtit
   );
 }
 
+/** Cabeçalho das telas empilhadas (fora das abas): voltar + título centralizado. */
+export function BackHeader({ title }: { title: string }) {
+  const router = useRouter();
+  return (
+    <View style={st.backHeader}>
+      <TouchableOpacity
+        onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'))}
+        hitSlop={8}
+        accessibilityLabel="Voltar"
+        accessibilityRole="button"
+      >
+        <IconBubble name="arrow-back" size={40} />
+      </TouchableOpacity>
+      <Text style={st.backHeaderTitle} numberOfLines={1}>{title}</Text>
+      <View style={{ width: 40 }} />
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
   glass: { backgroundColor: C.bgCard, borderWidth: 1, borderColor: C.border, borderRadius: R.lg },
   glassStrong: { backgroundColor: C.bgCardLt, borderColor: C.borderLt },
@@ -262,4 +282,10 @@ const st = StyleSheet.create({
   },
   headerTitle: { color: C.text, fontSize: 26, fontWeight: '700', letterSpacing: -0.3 },
   headerSub: { color: C.textMuted, fontSize: 12, marginTop: 2 },
+
+  backHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14, gap: 12,
+  },
+  backHeaderTitle: { color: C.text, fontSize: 18, fontWeight: '700', flexShrink: 1, textAlign: 'center' },
 });

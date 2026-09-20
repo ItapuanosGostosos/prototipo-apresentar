@@ -1,18 +1,43 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { C, R, TAB_BAR_SPACE, shadow } from '../../src/theme';
 import { DecoBackground } from '../../src/components/ui/DecoBackground';
 import { DangerButton, GlassCard, IconBubble, type IconName } from '../../src/components/ui/primitives';
 import { useAuthStore } from '../../src/store/authStore';
+import { confirmAction } from '../../src/utils/feedback';
 
-const MENU_ITEMS: { id: string; icon: IconName; label: string }[] = [
-  { id: 'settings',   icon: 'person-outline',           label: 'Configurações de Perfil' },
-  { id: 'notifs',     icon: 'notifications-outline',    label: 'Notificações' },
-  { id: 'privacy',    icon: 'shield-checkmark-outline', label: 'Política de Privacidade' },
-  { id: 'help',       icon: 'headset-outline',          label: 'Ajuda & Suporte' },
+const MENU_ITEMS: { id: string; icon: IconName; label: string; hint: string; href: Href }[] = [
+  {
+    id: 'settings',
+    icon: 'person-outline',
+    label: 'Configurações de Perfil',
+    hint: 'Nome, CPF e senha',
+    href: '/profile-settings',
+  },
+  {
+    id: 'notifs',
+    icon: 'notifications-outline',
+    label: 'Notificações',
+    hint: 'Ativar, desativar e testar avisos',
+    href: '/notifications-settings',
+  },
+  {
+    id: 'privacy',
+    icon: 'shield-checkmark-outline',
+    label: 'Política de Privacidade',
+    hint: 'Quais dados usamos e por quê',
+    href: '/privacy-policy',
+  },
+  {
+    id: 'help',
+    icon: 'headset-outline',
+    label: 'Ajuda & Suporte',
+    hint: 'Perguntas frequentes e contato',
+    href: '/help-support',
+  },
 ];
 
 export default function ProfileScreen() {
@@ -22,10 +47,13 @@ export default function ProfileScreen() {
   const initial  = username[0]?.toUpperCase() ?? 'U';
 
   function handleLogout() {
-    Alert.alert('Sair', 'Deseja sair da sua conta?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: logout },
-    ]);
+    confirmAction({
+      title: 'Sair da conta',
+      message: 'Deseja sair da sua conta?',
+      confirmLabel: 'Sair',
+      destructive: true,
+      onConfirm: () => { logout(); },
+    });
   }
 
   return (
@@ -45,24 +73,24 @@ export default function ProfileScreen() {
 
           {/* Menu (linhas translúcidas com ícone e chevron) */}
           <View style={s.menu}>
-            {MENU_ITEMS.map((item) => {
-              const enabled = item.id === 'settings';
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  activeOpacity={0.8}
-                  disabled={!enabled}
-                  onPress={enabled ? () => router.push('/profile-settings') : undefined}
-                  accessibilityRole="button"
-                >
-                  <GlassCard style={[s.menuItem, !enabled && s.menuItemDisabled]}>
-                    <IconBubble name={item.icon} size={38} color={C.textSec} />
+            {MENU_ITEMS.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                activeOpacity={0.8}
+                onPress={() => router.push(item.href)}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
+              >
+                <GlassCard style={s.menuItem}>
+                  <IconBubble name={item.icon} size={38} color={C.textSec} />
+                  <View style={{ flex: 1 }}>
                     <Text style={s.menuLabel}>{item.label}</Text>
-                    <Ionicons name="chevron-forward" color={C.textMuted} size={18} />
-                  </GlassCard>
-                </TouchableOpacity>
-              );
-            })}
+                    <Text style={s.menuHint}>{item.hint}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" color={C.textMuted} size={18} />
+                </GlassCard>
+              </TouchableOpacity>
+            ))}
           </View>
 
           <DangerButton label="Sair da conta" onPress={handleLogout} style={s.logout} />
@@ -88,8 +116,8 @@ const s = StyleSheet.create({
 
   menu: { width: '100%', gap: 10 },
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, borderRadius: R.lg },
-  menuItemDisabled: { opacity: 0.55 },
-  menuLabel: { color: C.text, fontSize: 15, fontWeight: '500', flex: 1 },
+  menuLabel: { color: C.text, fontSize: 15, fontWeight: '500' },
+  menuHint: { color: C.textMuted, fontSize: 12, marginTop: 2 },
 
   logout: { alignSelf: 'center', minWidth: 200, marginTop: 28 },
 });

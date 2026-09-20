@@ -75,3 +75,9 @@ export const shadow = {
     elevation: 12,
   },
 } as const;
+
+/** Largura máxima da coluna de conteúdo em telas largas (web/tablet). */
+export const CONTENT_MAX_WIDTH = 720;
+
+/** Largura máxima da tab bar flutuante — centralizada na mesma coluna do conteúdo. */
+export const TAB_BAR_MAX_WIDTH = 560;
