@@ -283,7 +283,9 @@ const s = StyleSheet.create({
   page: { flex: 1, width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
-  filterScroll: { flexGrow: 0, marginBottom: 8 },
+  // flexShrink: 0 é obrigatório: o ScrollView do react-native-web nasce com
+  // flexShrink 1 e a lista abaixo esmagava a linha de filtros até sumir.
+  filterScroll: { flexGrow: 0, flexShrink: 0, marginBottom: 8 },
   filterRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center', paddingVertical: 4 },
   searchWrap: { paddingHorizontal: 20, marginBottom: 8, position: 'relative' },
   searchIcon: { position: 'absolute', left: 34, top: 15, zIndex: 1 },

@@ -420,6 +420,6 @@ const s = StyleSheet.create({
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   sheetTitle: { color: C.text, fontSize: 20, fontWeight: '700' },
   sheetInput: { marginBottom: 16 },
-  typeScroll: { flexGrow: 0, marginBottom: 20 },
+  typeScroll: { flexGrow: 0, flexShrink: 0, marginBottom: 20 },
   typeRow: { gap: 8, alignItems: 'center', paddingVertical: 2 },
 });

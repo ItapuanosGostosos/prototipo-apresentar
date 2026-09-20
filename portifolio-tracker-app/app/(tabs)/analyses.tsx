@@ -412,7 +412,9 @@ const s = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40, paddingBottom: TAB_BAR_SPACE / 2 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
-  chipScroll: { flexGrow: 0, marginBottom: 6 },
+  // flexShrink: 0 é obrigatório: o ScrollView do react-native-web nasce com
+  // flexShrink 1 e a lista abaixo esmagava a linha de chips até sumir.
+  chipScroll: { flexGrow: 0, flexShrink: 0, marginBottom: 6 },
   chipRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center', paddingVertical: 4 },
   timeChip: { paddingHorizontal: 18 },
 
