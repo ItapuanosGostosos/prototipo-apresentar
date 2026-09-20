@@ -1,10 +1,11 @@
 services:
-  keycloak:
+    keycloak:
     image: quay.io/keycloak/keycloak:24.0.1
     container_name: portfolio_keycloak
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      JAVA_OPTS_APPEND: "-Xmx320m"
     command: start-dev --import-realm
     ports:
       - "8080:8080"
