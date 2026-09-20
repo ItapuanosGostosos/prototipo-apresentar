@@ -19,8 +19,14 @@ _google_fetcher = GoogleNewsFetcher()
 FALLBACK_TICKERS = ['PETR4', 'VALE3', 'ITUB4', 'BBDC4', 'ABEV3', 'MGLU3', 'WEGE3', 'BTC-USD', 'HGLG11', 'KNRI11']
 
 
-def _fetch_live(tickers: list[str]) -> list:
+# Tipos que o Yahoo Finance nao cobre: medimos 0 noticias para FII e ETF em
+# MXRF11, HGLG11, BOVA11 e IVVB11. Para esses o Google News e a unica fonte.
+_SEM_COBERTURA_NO_YAHOO = ('fii', 'etf')
+
+
+def _fetch_live(tickers: list[str], asset_types: dict[str, str] | None = None) -> list:
     fetch_tickers = tickers or FALLBACK_TICKERS
+    asset_types = asset_types or {}
     seen_urls: set[str] = set()
     all_articles = []
 
@@ -35,10 +41,18 @@ def _fetch_live(tickers: list[str]) -> list:
     except Exception as exc:
         logger.error('YFinance live fetch error: %s', exc)
 
-    fii_tickers = [t for t in fetch_tickers if GoogleNewsFetcher._is_fii(t)]
-    if fii_tickers:
+    # Com o tipo em maos usamos o tipo; sem ele, o palpite antigo pelo sufixo.
+    # O palpite errava em ETF: BOVA11 e IVVB11 terminam em 11 como os FIIs e
+    # acabavam pesquisados como "fundo imobiliario".
+    se_precisa_google = (
+        (lambda t: asset_types.get(t) in _SEM_COBERTURA_NO_YAHOO)
+        if asset_types
+        else GoogleNewsFetcher._is_fii
+    )
+    google_tickers = [t for t in fetch_tickers if se_precisa_google(t)]
+    if google_tickers:
         try:
-            _add(_google_fetcher.fetch(fii_tickers))
+            _add(_google_fetcher.fetch(google_tickers, asset_types=asset_types))
         except Exception as exc:
             logger.error('GoogleNews live fetch error: %s', exc)
 
@@ -51,12 +65,11 @@ class GlobalNewsListView(APIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get(self, request):
-        tickers = list(
+        pares = dict(
             Asset.objects.filter(portfolio__user=request.user)
-            .values_list('ticker', flat=True)
-            .distinct()
+            .values_list('ticker', 'asset_type')
         )
-        articles = _fetch_live(tickers)
+        articles = _fetch_live(list(pares), asset_types=pares)
         return Response(LiveNewsArticleSerializer(articles, many=True).data)
 
 
@@ -70,8 +83,8 @@ class PortfolioNewsListView(APIView):
         except Portfolio.DoesNotExist:
             raise NotFound('Portfolio not found.')
 
-        tickers = list(portfolio.assets.values_list('ticker', flat=True).distinct())
-        articles = _fetch_live(tickers)
+        pares = dict(portfolio.assets.values_list('ticker', 'asset_type'))
+        articles = _fetch_live(list(pares), asset_types=pares)
         return Response(LiveNewsArticleSerializer(articles, many=True).data)
 
 

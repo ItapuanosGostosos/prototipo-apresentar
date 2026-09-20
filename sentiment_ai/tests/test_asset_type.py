@@ -115,3 +115,67 @@ class MapaDeTiposNaTaskTests(TestCase):
 
         self.assertEqual(recebidos.get("IVVB11"), "etf")
         self.assertEqual(recebidos.get("MXRF11"), "fii")
+
+
+class FeedAoVivoTests(TestCase):
+    """O feed ao vivo (aba Noticias) tambem escolhe a fonte pelo tipo.
+
+    Ele tinha uma copia propria do palpite pelo sufixo, entao o IVVB11 era
+    pesquisado como "fundo imobiliario" mesmo depois da correcao na analise.
+    """
+
+    def setUp(self):
+        user = get_user_model().objects.create_user(
+            username="feed-tester", password="x"
+        )
+        self.portfolio = Portfolio.objects.create(user=user, name="Feed")
+        for ticker, nome, tipo in (
+            ("IVVB11", "ETF S&P 500", Asset.AssetType.ETF),
+            ("MXRF11", "Maxi Renda", Asset.AssetType.FII),
+            ("PETR4", "Petrobras", Asset.AssetType.STOCK),
+        ):
+            Asset.objects.create(
+                portfolio=self.portfolio, ticker=ticker, name=nome, asset_type=tipo
+            )
+
+    def _chamar_feed(self):
+        from news import controller
+
+        recebido = {}
+
+        def fake_google(tickers, asset_types=None):
+            recebido["tickers"] = list(tickers)
+            recebido["asset_types"] = dict(asset_types or {})
+            return []
+
+        with patch.object(controller._google_fetcher, "fetch", fake_google),              patch.object(controller._fetcher, "fetch", lambda t, asset_types=None: []):
+            pares = dict(self.portfolio.assets.values_list("ticker", "asset_type"))
+            controller._fetch_live(list(pares), asset_types=pares)
+        return recebido
+
+    def test_etf_e_fii_vao_para_o_google_a_acao_nao(self):
+        # O Yahoo devolve 0 noticias para FII e ETF; para acao ele cobre.
+        recebido = self._chamar_feed()
+        self.assertIn("IVVB11", recebido["tickers"])
+        self.assertIn("MXRF11", recebido["tickers"])
+        self.assertNotIn("PETR4", recebido["tickers"])
+
+    def test_o_tipo_chega_ao_fetcher_do_feed(self):
+        recebido = self._chamar_feed()
+        self.assertEqual(recebido["asset_types"].get("IVVB11"), "etf")
+        self.assertEqual(recebido["asset_types"].get("MXRF11"), "fii")
+
+    def test_sem_tipo_mantem_o_palpite_antigo(self):
+        from news import controller
+
+        recebido = {}
+
+        def fake_google(tickers, asset_types=None):
+            recebido["tickers"] = list(tickers)
+            return []
+
+        with patch.object(controller._google_fetcher, "fetch", fake_google),              patch.object(controller._fetcher, "fetch", lambda t, asset_types=None: []):
+            controller._fetch_live(["MXRF11", "PETR4"])
+
+        # Sem o mapa, cai no sufixo: MXRF11 entra, PETR4 nao.
+        self.assertEqual(recebido["tickers"], ["MXRF11"])
