@@ -10,19 +10,20 @@ import {
   ScrollView,
   Image,
   Linking,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { C, R, TAB_BAR_SPACE, shadow } from '../../src/theme';
+import { C, R, TAB_BAR_SPACE, CONTENT_MAX_WIDTH, shadow } from '../../src/theme';
 import { DecoBackground } from '../../src/components/ui/DecoBackground';
 import { Chip, EmptyState, GhostButton, GlassCard, Input, ScreenHeader } from '../../src/components/ui/primitives';
 import { getGlobalNews, getPortfolioNews } from '../../src/services/news';
 import { listPortfolios } from '../../src/services/portfolios';
 import { analysePortfolio } from '../../src/services/analyses';
+import { UserAvatar } from '../../src/components/ui/UserAvatar';
 import type { NewsArticle, PortfolioListItem } from '../../src/types';
+import { notify } from '../../src/utils/feedback';
 
 type FilterMode = 'all' | 'portfolio' | 'ticker';
 
@@ -142,23 +143,32 @@ export default function NewsScreen() {
   });
 
   const analyseMutation = useMutation({
-    mutationFn: (id: number) => analysePortfolio(id),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['analyses'] });
-      Alert.alert('Análise iniciada', `Tarefa ${data.task_id} enfileirada.\nVeja os resultados em Análises.`);
+    mutationFn: async (ids: number[]) => {
+      const tasks: string[] = [];
+      for (const id of ids) {
+        const res = await analysePortfolio(id);
+        tasks.push(res.task_id);
+      }
+      return tasks;
     },
-    onError: (err: Error) => Alert.alert('Erro', err.message),
+    onSuccess: (tasks) => {
+      qc.invalidateQueries({ queryKey: ['analyses'] });
+      notify(
+        'Análise iniciada',
+        tasks.length === 1
+          ? `Tarefa ${tasks[0]} enfileirada. Veja os resultados em Analytics.`
+          : `${tasks.length} carteiras enfileiradas. Veja os resultados em Analytics.`,
+      );
+    },
+    onError: (err: Error) => notify('Erro', err.message),
   });
 
+  /** Sem carteira escolhida no filtro, analisa todas as carteiras do usuário. */
   function handleAnalyse() {
     const list = portfolios ?? [];
-    if (!list.length) { Alert.alert('Sem portfólios', 'Crie um portfólio primeiro.'); return; }
-    if (filterMode === 'portfolio' && selectedPortfolioId) { analyseMutation.mutate(selectedPortfolioId); return; }
-    if (list.length === 1) { analyseMutation.mutate(list[0].id); return; }
-    Alert.alert('Analisar', 'Escolha o portfólio:', [
-      ...list.map((p) => ({ text: p.name, onPress: () => analyseMutation.mutate(p.id) })),
-      { text: 'Cancelar', style: 'cancel' as const },
-    ]);
+    if (!list.length) { notify('Sem carteiras', 'Crie uma carteira primeiro na aba Carteira.'); return; }
+    if (filterMode === 'portfolio' && selectedPortfolioId) { analyseMutation.mutate([selectedPortfolioId]); return; }
+    analyseMutation.mutate(list.map((p) => p.id));
   }
 
   const rawArticles: NewsArticle[] = filterMode === 'portfolio' ? (portfolioNews ?? []) : (globalNews ?? []);
@@ -181,12 +191,15 @@ export default function NewsScreen() {
           title="Notícias"
           subtitle={articles.length > 0 ? `${articles.length} artigos` : undefined}
           right={
-            <GhostButton
-              label="Analisar"
-              icon="sparkles-outline"
-              onPress={handleAnalyse}
-              loading={analyseMutation.isPending}
-            />
+            <View style={s.headerActions}>
+              <GhostButton
+                label="Analisar"
+                icon="sparkles-outline"
+                onPress={handleAnalyse}
+                loading={analyseMutation.isPending}
+              />
+              <UserAvatar size={40} />
+            </View>
           }
         />
 
@@ -267,7 +280,8 @@ export default function NewsScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   // Largura máxima do conteúdo em telas largas (web/tablet)
-  page: { flex: 1, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  page: { flex: 1, width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   filterScroll: { flexGrow: 0, marginBottom: 8 },
   filterRow: { paddingHorizontal: 20, gap: 8, alignItems: 'center', paddingVertical: 4 },

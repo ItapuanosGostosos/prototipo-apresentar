@@ -12,9 +12,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { C, R, TAB_BAR_SPACE, shadow } from '../../src/theme';
+import { C, R, TAB_BAR_SPACE, CONTENT_MAX_WIDTH } from '../../src/theme';
 import { DecoBackground } from '../../src/components/ui/DecoBackground';
 import { GlassCard, IconBubble } from '../../src/components/ui/primitives';
+import { UserAvatar } from '../../src/components/ui/UserAvatar';
 import { useAuthStore } from '../../src/store/authStore';
 import { listPortfolios } from '../../src/services/portfolios';
 import { getGlobalNews } from '../../src/services/news';
@@ -25,16 +26,6 @@ function greeting(): string {
   if (h < 12) return 'Bom dia';
   if (h < 18) return 'Boa tarde';
   return 'Boa noite';
-}
-
-function Avatar({ name }: { name: string }) {
-  return (
-    <LinearGradient colors={[C.accentLt, C.pink]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.avatarRing}>
-      <View style={s.avatar}>
-        <Text style={s.avatarText}>{name[0]?.toUpperCase() ?? 'U'}</Text>
-      </View>
-    </LinearGradient>
-  );
 }
 
 /** Cartão "Minha carteira" (Figma "My wallet"): resumo dos portfólios em mini-cards. */
@@ -140,7 +131,8 @@ export default function HomeScreen() {
               <Text style={s.greeting}>{greeting()} 👋</Text>
               <Text style={s.username}>{username}</Text>
             </View>
-            <Avatar name={username} />
+            {/* Toque no avatar leva para o Perfil */}
+            <UserAvatar size={50} />
           </View>
 
           {/* Wallet card */}
@@ -202,7 +194,7 @@ export default function HomeScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  scroll: { paddingHorizontal: 20, paddingBottom: TAB_BAR_SPACE, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  scroll: { paddingHorizontal: 20, paddingBottom: TAB_BAR_SPACE, width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
 
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -210,9 +202,6 @@ const s = StyleSheet.create({
   },
   greeting: { color: C.textMuted, fontSize: 13 },
   username: { color: C.text, fontSize: 24, fontWeight: '700', letterSpacing: -0.3 },
-  avatarRing: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', ...shadow.glow },
-  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.bgSolid, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: C.text, fontSize: 18, fontWeight: '700' },
 
   walletCard: { padding: 16, marginBottom: 24, borderRadius: R.xl },
   walletLoading: { height: 96, alignItems: 'center', justifyContent: 'center' },

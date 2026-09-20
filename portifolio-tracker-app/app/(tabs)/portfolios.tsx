@@ -1,23 +1,25 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, FlatList,
-  Modal, ActivityIndicator, Alert, ScrollView,
+  Modal, ActivityIndicator, ScrollView,
   TouchableWithoutFeedback, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { C, R, TAB_BAR_SPACE } from '../../src/theme';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
+import { C, R, TAB_BAR_SPACE, CONTENT_MAX_WIDTH } from '../../src/theme';
 import { DecoBackground } from '../../src/components/ui/DecoBackground';
 import {
   Chip, DashedAddButton, EmptyState, FieldLabel, GhostButton, GlassCard,
   IconBubble, Input, PrimaryButton, ScreenHeader, type IconName,
 } from '../../src/components/ui/primitives';
+import { UserAvatar } from '../../src/components/ui/UserAvatar';
 import {
   listPortfolios, getPortfolio, createPortfolio,
   deletePortfolio, addAsset, removeAsset,
 } from '../../src/services/portfolios';
 import type { Asset, AssetType, PortfolioListItem } from '../../src/types';
+import { confirmAction, notify } from '../../src/utils/feedback';
 
 const ASSET_TYPES: { value: AssetType; label: string; icon: IconName }[] = [
   { value: 'stock', label: 'Ação',   icon: 'trending-up-outline' },
@@ -34,6 +36,9 @@ const TYPE_COLORS: Record<AssetType, { bg: string; text: string }> = {
   etf:    { bg: 'rgba(179,156,255,0.18)', text: '#B39CFF' },
   bdr:    { bg: 'rgba(242,123,155,0.16)', text: C.pink },
 };
+
+/** Ativo + a carteira de onde ele veio (usado no modo "Todas"). */
+type AssetRow = { asset: Asset; portfolioId: number; portfolioName: string };
 
 /**
  * Bottom sheet compartilhado pelos modais de criar portfólio e adicionar ativo.
@@ -75,7 +80,9 @@ function SheetModal({ visible, title, onClose, children }: {
 }
 
 /** Tile de ativo em grade 2 colunas (Figma "Wallet"): ícone circular, ticker, nome e tipo. */
-function AssetTile({ asset, onRemove }: { asset: Asset; onRemove: () => void }) {
+function AssetTile({ asset, portfolioName, onRemove }: {
+  asset: Asset; portfolioName?: string; onRemove: () => void;
+}) {
   const col = TYPE_COLORS[asset.asset_type] ?? TYPE_COLORS.stock;
   const typeInfo = ASSET_TYPES.find((t) => t.value === asset.asset_type);
   return (
@@ -88,6 +95,12 @@ function AssetTile({ asset, onRemove }: { asset: Asset; onRemove: () => void }) 
       </View>
       <Text style={s.tileTicker}>{asset.ticker}</Text>
       <Text style={s.tileName} numberOfLines={1}>{asset.name}</Text>
+      {portfolioName ? (
+        <View style={s.tileWallet}>
+          <Ionicons name="wallet-outline" size={11} color={C.textMuted} />
+          <Text style={s.tileWalletText} numberOfLines={1}>{portfolioName}</Text>
+        </View>
+      ) : null}
       <View style={[s.typeTag, { backgroundColor: col.bg, borderColor: col.text + '55' }]}>
         <Text style={[s.typeTagText, { color: col.text }]}>{typeInfo?.label ?? asset.asset_type}</Text>
       </View>
@@ -97,6 +110,7 @@ function AssetTile({ asset, onRemove }: { asset: Asset; onRemove: () => void }) 
 
 export default function PortfoliosScreen() {
   const qc = useQueryClient();
+  // null = "Todas as carteiras": estado inicial, lista os ativos de todas dizendo a origem.
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showAddAsset, setShowAddAsset] = useState(false);
@@ -104,58 +118,100 @@ export default function PortfoliosScreen() {
   const [ticker, setTicker] = useState('');
   const [assetName, setAssetName] = useState('');
   const [assetType, setAssetType] = useState<AssetType>('stock');
+  /** Carteira que receberá o ativo (no modo "Todas" o usuário escolhe no próprio sheet). */
+  const [addTargetId, setAddTargetId] = useState<number | null>(null);
 
   const { data: portfolios, isLoading } = useQuery({ queryKey: ['portfolios'], queryFn: listPortfolios });
-  const { data: detail, isLoading: loadingDetail } = useQuery({
-    queryKey: ['portfolio', selectedId],
-    queryFn: () => getPortfolio(selectedId!),
-    enabled: selectedId !== null,
+  const list = portfolios ?? [];
+  const showingAll = selectedId === null;
+
+  const detailQueries = useQueries({
+    queries: list.map((p) => ({
+      queryKey: ['portfolio', p.id],
+      queryFn: () => getPortfolio(p.id),
+    })),
   });
+
+  const detailStamp = detailQueries.map((q) => q.dataUpdatedAt).join(',');
+
+  /** Ativos exibidos: da carteira escolhida, ou de todas com o nome da origem. */
+  const rows: AssetRow[] = useMemo(() => {
+    const out: AssetRow[] = [];
+    detailQueries.forEach((q, i) => {
+      const p = list[i];
+      if (!p) return;
+      if (!showingAll && p.id !== selectedId) return;
+      for (const asset of q.data?.assets ?? []) {
+        out.push({ asset, portfolioId: p.id, portfolioName: p.name });
+      }
+    });
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailStamp, list, showingAll, selectedId]);
+
+  const loadingDetail = showingAll
+    ? detailQueries.some((q) => q.isLoading)
+    : detailQueries.some((q, i) => list[i]?.id === selectedId && q.isLoading);
 
   const createMutation = useMutation({
     mutationFn: (name: string) => createPortfolio({ name }),
     onSuccess: (p) => { qc.invalidateQueries({ queryKey: ['portfolios'] }); setShowCreate(false); setNewName(''); setSelectedId(p.id); },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onError: (e: Error) => notify('Erro', e.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: deletePortfolio,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['portfolios'] }); setSelectedId(null); },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onError: (e: Error) => notify('Erro', e.message),
   });
 
   const addMutation = useMutation({
-    mutationFn: () => addAsset(selectedId!, { ticker: ticker.trim().toUpperCase(), name: assetName.trim(), asset_type: assetType }),
+    mutationFn: () => addAsset(addTargetId!, { ticker: ticker.trim().toUpperCase(), name: assetName.trim(), asset_type: assetType }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['portfolio', selectedId] });
+      qc.invalidateQueries({ queryKey: ['portfolio', addTargetId] });
       qc.invalidateQueries({ queryKey: ['portfolios'] });
       setShowAddAsset(false); setTicker(''); setAssetName(''); setAssetType('stock');
     },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    onError: (e: Error) => notify('Erro', e.message),
   });
 
   const removeMutation = useMutation({
-    mutationFn: (assetId: number) => removeAsset(selectedId!, assetId),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['portfolio', selectedId] }); qc.invalidateQueries({ queryKey: ['portfolios'] }); },
-    onError: (e: Error) => Alert.alert('Erro', e.message),
+    mutationFn: ({ portfolioId, assetId }: { portfolioId: number; assetId: number }) => removeAsset(portfolioId, assetId),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['portfolio', vars.portfolioId] });
+      qc.invalidateQueries({ queryKey: ['portfolios'] });
+    },
+    onError: (e: Error) => notify('Erro', e.message),
   });
 
   function confirmDelete(p: PortfolioListItem) {
-    Alert.alert('Excluir', `Excluir "${p.name}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate(p.id) },
-    ]);
+    confirmAction({
+      title: 'Excluir carteira',
+      message: `Excluir "${p.name}" e todos os seus ativos?`,
+      confirmLabel: 'Excluir',
+      destructive: true,
+      onConfirm: () => deleteMutation.mutate(p.id),
+    });
   }
 
-  function confirmRemove(asset: Asset) {
-    Alert.alert('Remover', `Remover ${asset.ticker}?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Remover', style: 'destructive', onPress: () => removeMutation.mutate(asset.id) },
-    ]);
+  function confirmRemove(row: AssetRow) {
+    confirmAction({
+      title: 'Remover ativo',
+      message: `Remover ${row.asset.ticker} de "${row.portfolioName}"?`,
+      confirmLabel: 'Remover',
+      destructive: true,
+      onConfirm: () => removeMutation.mutate({ portfolioId: row.portfolioId, assetId: row.asset.id }),
+    });
   }
 
-  const selected = portfolios?.find((p) => p.id === selectedId);
-  const assetCount = detail?.assets.length ?? 0;
+  function openAddAsset() {
+    if (list.length === 0) { setShowCreate(true); return; }
+    setAddTargetId(selectedId ?? list[0].id);
+    setShowAddAsset(true);
+  }
+
+  const selected = list.find((p) => p.id === selectedId) ?? null;
+  const assetCount = rows.length;
 
   if (isLoading) {
     return (
@@ -172,49 +228,59 @@ export default function PortfoliosScreen() {
       <SafeAreaView style={s.page} edges={['top', 'left', 'right']}>
         <ScreenHeader
           title="Carteira"
-          right={<GhostButton label="Novo" icon="add" onPress={() => setShowCreate(true)} />}
+          right={
+            <View style={s.headerActions}>
+              <GhostButton label="Novo" icon="add" onPress={() => setShowCreate(true)} />
+              <UserAvatar size={40} />
+            </View>
+          }
         />
 
-        {/* Portfólios (chips) */}
+        {/* Portfólios (chips) — "Todas" é o padrão */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll} contentContainerStyle={s.tabRow}>
-          {(portfolios ?? []).length === 0 ? (
+          {list.length === 0 ? (
             <Text style={s.emptyInline}>Nenhum portfólio criado.</Text>
           ) : (
-            (portfolios ?? []).map((p: PortfolioListItem) => (
+            <>
               <Chip
-                key={p.id}
-                label={p.name}
-                icon="wallet-outline"
-                count={p.asset_count}
-                active={selectedId === p.id}
-                onPress={() => setSelectedId(p.id)}
-                onLongPress={() => confirmDelete(p)}
+                label="Todas"
+                icon="albums-outline"
+                count={list.reduce((acc, p) => acc + p.asset_count, 0)}
+                active={showingAll}
+                onPress={() => setSelectedId(null)}
               />
-            ))
+              {list.map((p: PortfolioListItem) => (
+                <Chip
+                  key={p.id}
+                  label={p.name}
+                  icon="wallet-outline"
+                  count={p.asset_count}
+                  active={selectedId === p.id}
+                  onPress={() => setSelectedId(p.id)}
+                  onLongPress={() => confirmDelete(p)}
+                />
+              ))}
+            </>
           )}
         </ScrollView>
 
         {/* Ativos */}
-        {!selectedId ? (
+        {list.length === 0 ? (
           <View style={s.centered}>
             <EmptyState
               icon="wallet-outline"
-              title="Nenhum portfólio selecionado"
-              description="Selecione ou crie um portfólio para ver seus ativos."
+              title="Nenhum portfólio ainda"
+              description='Toque em "Novo" para criar sua primeira carteira.'
             />
           </View>
-        ) : loadingDetail ? (
-          <ActivityIndicator color={C.accentLt} style={{ marginTop: 40 }} />
         ) : (
           <View style={s.assetSection}>
             <View style={s.assetHeader}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={s.assetSectionTitle}>Ativos</Text>
-                {selected ? (
-                  <Text style={s.assetSectionSub}>
-                    {selected.name} · {assetCount} {assetCount === 1 ? 'ativo' : 'ativos'}
-                  </Text>
-                ) : null}
+                <Text style={s.assetSectionSub}>
+                  {showingAll ? 'Todas as carteiras' : selected?.name ?? ''} · {assetCount} {assetCount === 1 ? 'ativo' : 'ativos'}
+                </Text>
               </View>
               <View style={s.assetActions}>
                 {selected ? (
@@ -222,25 +288,37 @@ export default function PortfoliosScreen() {
                     <IconBubble name="trash-outline" size={38} color="#FF8A8A" />
                   </TouchableOpacity>
                 ) : null}
-                <GhostButton label="Adicionar" icon="add" onPress={() => setShowAddAsset(true)} />
+                <GhostButton label="Adicionar" icon="add" onPress={openAddAsset} />
               </View>
             </View>
 
-            {!detail?.assets.length ? (
+            {loadingDetail ? (
+              <ActivityIndicator color={C.accentLt} style={{ marginTop: 40 }} />
+            ) : rows.length === 0 ? (
               <View style={s.emptyAssets}>
-                <EmptyState icon="stats-chart-outline" title="Nenhum ativo ainda" description="Adicione seu primeiro ativo a este portfólio." />
-                <DashedAddButton label="Adicionar ativo" onPress={() => setShowAddAsset(true)} style={s.emptyAdd} />
+                <EmptyState
+                  icon="stats-chart-outline"
+                  title="Nenhum ativo ainda"
+                  description={showingAll ? 'Adicione o primeiro ativo a uma das suas carteiras.' : 'Adicione seu primeiro ativo a este portfólio.'}
+                />
+                <DashedAddButton label="Adicionar ativo" onPress={openAddAsset} style={s.emptyAdd} />
               </View>
             ) : (
               <FlatList
-                data={detail.assets}
-                keyExtractor={(i) => String(i.id)}
+                data={rows}
+                keyExtractor={(r) => `${r.portfolioId}:${r.asset.id}`}
                 numColumns={2}
                 columnWrapperStyle={s.gridRow}
                 contentContainerStyle={s.grid}
                 showsVerticalScrollIndicator={false}
-                renderItem={({ item }) => <AssetTile asset={item} onRemove={() => confirmRemove(item)} />}
-                ListFooterComponent={<DashedAddButton onPress={() => setShowAddAsset(true)} style={s.footerAdd} />}
+                renderItem={({ item }) => (
+                  <AssetTile
+                    asset={item.asset}
+                    portfolioName={showingAll ? item.portfolioName : undefined}
+                    onRemove={() => confirmRemove(item)}
+                  />
+                )}
+                ListFooterComponent={<DashedAddButton onPress={openAddAsset} style={s.footerAdd} />}
               />
             )}
           </View>
@@ -260,6 +338,16 @@ export default function PortfoliosScreen() {
 
         {/* Modal: adicionar ativo */}
         <SheetModal visible={showAddAsset} title="Adicionar ativo" onClose={() => setShowAddAsset(false)}>
+          {list.length > 1 && (
+            <>
+              <FieldLabel>Carteira</FieldLabel>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.typeScroll} contentContainerStyle={s.typeRow} keyboardShouldPersistTaps="handled">
+                {list.map((p) => (
+                  <Chip key={p.id} label={p.name} icon="wallet-outline" active={addTargetId === p.id} onPress={() => setAddTargetId(p.id)} />
+                ))}
+              </ScrollView>
+            </>
+          )}
           <FieldLabel>Ticker</FieldLabel>
           <Input placeholder="Ex: PETR4, BTC" value={ticker} onChangeText={setTicker} autoCapitalize="characters" style={s.sheetInput} />
           <FieldLabel>Nome</FieldLabel>
@@ -272,7 +360,7 @@ export default function PortfoliosScreen() {
           </ScrollView>
           <PrimaryButton
             label="Adicionar"
-            disabled={!ticker.trim() || !assetName.trim()}
+            disabled={!ticker.trim() || !assetName.trim() || addTargetId === null}
             loading={addMutation.isPending}
             onPress={() => addMutation.mutate()}
           />
@@ -285,9 +373,10 @@ export default function PortfoliosScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   // Largura máxima do conteúdo em telas largas (web/tablet)
-  page: { flex: 1, width: '100%', maxWidth: 720, alignSelf: 'center' },
+  page: { flex: 1, width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40, paddingBottom: TAB_BAR_SPACE / 2 },
   emptyInline: { color: C.textMuted, fontSize: 14, paddingVertical: 8 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   // Sem altura fixa: a linha de chips tem a altura do próprio conteúdo.
   tabScroll: { flexGrow: 0, flexShrink: 0, marginBottom: 4 },
@@ -296,7 +385,7 @@ const s = StyleSheet.create({
   assetSection: { flex: 1, paddingHorizontal: 20 },
   assetHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 12, marginTop: 6,
+    marginBottom: 12, marginTop: 6, gap: 8,
   },
   assetSectionTitle: { color: C.text, fontSize: 18, fontWeight: '600' },
   assetSectionSub: { color: C.textMuted, fontSize: 12, marginTop: 2 },
@@ -310,8 +399,10 @@ const s = StyleSheet.create({
     width: 26, height: 26, borderRadius: 13, backgroundColor: C.dangerSoft, alignItems: 'center', justifyContent: 'center',
   },
   tileTicker: { color: C.text, fontWeight: '700', fontSize: 17, letterSpacing: 0.2 },
-  tileName: { color: C.textMuted, fontSize: 12, marginBottom: 6 },
-  typeTag: { alignSelf: 'flex-start', borderRadius: R.pill, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 3 },
+  tileName: { color: C.textMuted, fontSize: 12 },
+  tileWallet: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  tileWalletText: { color: C.textSec, fontSize: 11, flex: 1 },
+  typeTag: { alignSelf: 'flex-start', borderRadius: R.pill, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 3, marginTop: 4 },
   typeTagText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   footerAdd: { marginTop: 4 },
   emptyAssets: { alignItems: 'center', marginTop: 28, gap: 20 },

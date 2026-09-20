@@ -2,7 +2,7 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, shadow } from '../../src/theme';
+import { C, shadow, TAB_BAR_MAX_WIDTH } from '../../src/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -21,9 +21,8 @@ function TabIcon({ focused, outline, filled }: { focused: boolean; outline: Icon
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  // Em telas largas (web/tablet) a barra não ocupa a largura toda: no máximo 560px, centralizada.
-  const barWidth = Math.min(width - 32, 560);
-  const barLeft = Math.round((width - barWidth) / 2);
+  // Em telas largas (web/tablet) a barra não ocupa a largura toda: no máximo 560px.
+  const barWidth = Math.min(width - 32, TAB_BAR_MAX_WIDTH);
 
   return (
     <Tabs
@@ -36,13 +35,18 @@ export default function TabsLayout() {
         tabBarInactiveTintColor: C.tabInactive,
         tabBarStyle: {
           position: 'absolute',
-          left: barLeft,
+          // Centraliza pelo próprio container do app (e não pela largura da janela,
+          // que na web inclui a barra de rolagem e deslocava a barra para a direita).
+          left: 'auto',
+          right: 'auto',
+          alignSelf: 'center',
           width: barWidth,
           bottom: Math.max(insets.bottom, 12),
           height: 64,
           borderRadius: 32,
           backgroundColor: C.tabBar,
           borderTopWidth: 0,
+          paddingHorizontal: 0,
           overflow: 'visible',
           ...shadow.soft,
         },
