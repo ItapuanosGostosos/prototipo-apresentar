@@ -13,18 +13,11 @@
         <mxCell id="Z0RW3dffUJlpLu8tIbBc-5" edge="1" parent="1" source="Z0RW3dffUJlpLu8tIbBc-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="Z0RW3dffUJlpLu8tIbBc-4">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="VZUymnYtFafkCwwtPIZD-20" edge="1" parent="1" source="Z0RW3dffUJlpLu8tIbBc-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="-70" y="850" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
         <mxCell id="Z0RW3dffUJlpLu8tIbBc-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="KeyCloak" vertex="1">
           <mxGeometry height="70" width="270" x="560" y="440" as="geometry" />
         </mxCell>
-        <mxCell id="VZUymnYtFafkCwwtPIZD-21" edge="1" parent="1" source="Z0RW3dffUJlpLu8tIbBc-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="170" y="860" as="targetPoint" />
-          </mxGeometry>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-21" edge="1" parent="1" source="Z0RW3dffUJlpLu8tIbBc-4" target="Z0RW3dffUJlpLu8tIbBc-8" value="consulta e grava" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="Z0RW3dffUJlpLu8tIbBc-13" edge="1" parent="1" source="Z0RW3dffUJlpLu8tIbBc-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="Z0RW3dffUJlpLu8tIbBc-10">
           <mxGeometry relative="1" as="geometry" />
@@ -84,23 +77,11 @@
         <mxCell id="VZUymnYtFafkCwwtPIZD-36" parent="VZUymnYtFafkCwwtPIZD-13" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Toda análise de sentimento é gravada no banco com ID, ticker, status, idioma, motor (engine), nota de sentimento, relevância, relatório em português e o JSON completo da análise." vertex="1">
           <mxGeometry height="70" width="140" x="670" y="370" as="geometry" />
         </mxCell>
-        <mxCell id="VZUymnYtFafkCwwtPIZD-38" edge="1" parent="VZUymnYtFafkCwwtPIZD-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="VZUymnYtFafkCwwtPIZD-35">
-          <mxGeometry relative="1" as="geometry">
-            <Array as="points">
-              <mxPoint x="540" y="130.06" />
-              <mxPoint x="540" y="310.06" />
-            </Array>
-            <mxPoint x="500" y="130.05882352941194" as="sourcePoint" />
-            <mxPoint x="600.0000648789278" y="310.0588235294117" as="targetPoint" />
-          </mxGeometry>
-        </mxCell>
         <mxCell id="VZUymnYtFafkCwwtPIZD-17" parent="1" style="swimlane;whiteSpace=wrap;html=1;" value="AWS" vertex="1">
           <mxGeometry height="990" width="710" x="530" y="350" as="geometry" />
         </mxCell>
-        <mxCell id="VZUymnYtFafkCwwtPIZD-34" edge="1" parent="VZUymnYtFafkCwwtPIZD-17" source="Z0RW3dffUJlpLu8tIbBc-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">
-          <mxGeometry relative="1" as="geometry">
-            <mxPoint x="-266.66666666666663" y="660" as="targetPoint" />
-          </mxGeometry>
+        <mxCell id="VZUymnYtFafkCwwtPIZD-34" edge="1" parent="1" source="8Q1NDgMDF9Obbsjo35JJ-16" target="VZUymnYtFafkCwwtPIZD-35" value="grava o resultado" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="Z0RW3dffUJlpLu8tIbBc-17" parent="VZUymnYtFafkCwwtPIZD-17" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="MOTOR SENTIMENTO pt-BR" vertex="1">
           <mxGeometry height="80" width="80" x="340" y="720" as="geometry" />
@@ -114,7 +95,7 @@
         <mxCell id="VZUymnYtFafkCwwtPIZD-32" parent="VZUymnYtFafkCwwtPIZD-17" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="A API GRAVA A ANÁLISE COMO PENDENTE E PUBLICA O ID NA FILA.&lt;br&gt;A FILA SÓ TRANSPORTA A MENSAGEM &amp;#8212; QUEM PROCESSA É O WORKER, QUE CONSOME O ID." vertex="1">
           <mxGeometry height="30" width="155" x="470" y="525" as="geometry" />
         </mxCell>
-        <mxCell id="VZUymnYtFafkCwwtPIZD-33" parent="VZUymnYtFafkCwwtPIZD-17" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="APOS A ANALISE A IA DEVERA ATUALIZAR O REQUEST DA NOTICIA NO BANCO DE DADOS PARA O RETORNO" vertex="1">
+        <mxCell id="VZUymnYtFafkCwwtPIZD-33" parent="VZUymnYtFafkCwwtPIZD-17" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="APOS A ANALISE, O WORKER GRAVA O RESULTADO NA TABELA ANALISES.&lt;br&gt;A API PASSA A DEVOLVE-LO AO APP NA CONSULTA SEGUINTE." vertex="1">
           <mxGeometry height="90" width="160" x="30" y="660" as="geometry" />
         </mxCell>
         <mxCell id="VZUymnYtFafkCwwtPIZD-28" edge="1" parent="VZUymnYtFafkCwwtPIZD-17" source="Z0RW3dffUJlpLu8tIbBc-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="VZUymnYtFafkCwwtPIZD-27">
@@ -133,13 +114,10 @@
           <mxGeometry height="280" width="350" x="275" y="650" as="geometry" />
         </mxCell>
         <mxCell id="VZUymnYtFafkCwwtPIZD-7" parent="8Q1NDgMDF9Obbsjo35JJ-16" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Motor de análise de sentimento &lt;b&gt;baseado em regras&lt;/b&gt;, não treinado.&lt;br&gt;Léxico e regras próprios no pt-BR; VADER no inglês.&lt;br&gt;Avalia se a notícia é positiva, neutra ou negativa para o ativo." vertex="1">
-          <mxGeometry height="90" width="140" x="105" y="160" as="geometry" />
+          <mxGeometry height="105" width="215" x="68" y="168" as="geometry" />
         </mxCell>
         <mxCell id="Z0RW3dffUJlpLu8tIbBc-18" parent="8Q1NDgMDF9Obbsjo35JJ-16" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" value="MOTOR SENTIMENTO EN" vertex="1">
           <mxGeometry height="80" width="80" x="195" y="70" as="geometry" />
-        </mxCell>
-        <mxCell id="VZUymnYtFafkCwwtPIZD-18" edge="1" parent="1" source="VZUymnYtFafkCwwtPIZD-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" target="VZUymnYtFafkCwwtPIZD-8">
-          <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="VZUymnYtFafkCwwtPIZD-22" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Realizará o cadastro de carteiras e request de analises pendentes" vertex="1">
           <mxGeometry height="60" width="140" x="30" y="630" as="geometry" />
